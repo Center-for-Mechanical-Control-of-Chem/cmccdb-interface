@@ -1,0 +1,1096 @@
+name: "Indole_Synthesis"
+description: "Indole_Synthesis"
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: "A solution of dimers in DMSO (100 \316\274L, 0.3 mM) was prepared\n"
+        }
+      }
+      addition_order: 2
+    }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 99.99
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:39.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b07"
+}
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+   key: "Silver Acetate"
+   value {
+     components {
+       identifiers {
+         type: SMILES
+         value: " CC([O-])=O.[Ag+]"
+       }
+       amount {
+         moles {
+           value: 2.0
+           units: MILLIMOLE
+         }
+       }
+       reaction_role: REACTANT
+       preparations {
+         type: CUSTOM
+         details: ""
+       }
+     }
+     addition_order: 3
+   }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 99.99
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:45.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b08"
+}                                   
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+   key: "Copper(II)Oxide"
+   value {
+     components {
+       identifiers {
+         type: SMILES
+         value: " [Cu+2].[O-2]"
+       }
+       amount {
+         moles {
+           value: 2.0
+           units: MILLIMOLE
+         }
+       }
+       reaction_role: REACTANT
+       preparations {
+         type: CUSTOM
+         details: ""
+       }
+     }
+     addition_order: 3
+   }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 50
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:50.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b09"
+}
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+   key: "Manganese Dioxide"
+   value {
+     components {
+       identifiers {
+         type: SMILES
+         value: " [Mn+2].[Mn+2].[O-2].[O-2]"
+       }
+       amount {
+         moles {
+           value: 2.0
+           units: MILLIMOLE
+         }
+       }
+       reaction_role: REACTANT
+       preparations {
+         type: CUSTOM
+         details: ""
+       }
+     }
+     addition_order: 3
+   }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 61
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:60.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b10"
+}
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 18
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:18.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b11"
+}
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+   key: "Manganese Dioxide"
+   value {
+     components {
+       identifiers {
+         type: SMILES
+         value: " [Mn+2].[Mn+2].[O-2].[O-2]"
+       }
+       amount {
+         moles {
+           value: 1.2
+           units: MILLIMOLE
+         }
+       }
+       reaction_role: REACTANT
+       preparations {
+         type: CUSTOM
+         details: ""
+       }
+     }
+     addition_order: 3
+   }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 62
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:62.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b12"
+}
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "IndoleSynthesis"
+  }
+  inputs {
+    key: "Ethyl Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+      }
+      addition_order: 1
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        preparations {
+          type: CUSTOM
+          details: ""
+        }
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+   key: "Manganese Dioxide"
+   value {
+     components {
+       identifiers {
+         type: SMILES
+         value: " [Mn+2].[Mn+2].[O-2].[O-2]"
+       }
+       amount {
+         moles {
+           value: 0.8
+           units: MILLIMOLE
+         }
+       }
+       reaction_role: REACTANT
+       preparations {
+         type: CUSTOM
+         details: ""
+       }
+     }
+     addition_order: 3
+   }
+  }
+  setup {
+    vessel {
+      type: CUSTOM
+      details: "Ball" 
+      material {
+        type: METAL
+        details: "Ball Mills"
+      }
+      volume {
+        value: 2.0
+        units: MILLILITER
+      }
+    }
+  }
+  conditions {
+    temperature {
+      setpoint {
+        value: 25.0
+        units: CELSIUS
+      }
+    }
+    stirring {
+      type: BALL_MILLING
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 0.417
+      units: HOUR
+    }
+    conversion {
+      value: 48
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:48.0
+        }
+      }
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN(C=C1C(CC(OCC)=O)C2=CN(C)C3=C2C=CC=C3)C4=C1C=CC=C4"
+      }
+      measurements {
+        analysis_key:"weight"
+        type:YIELD
+        uses_internal_standard: false
+        is_normalized: true
+        uses_authentic_standard: false
+        percentage {
+          value:0.0
+        }
+      }
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: CUSTOM
+        details: "NMR"
+      }
+    }
+  }
+  provenance {
+    experimenter {
+      orcid: "0000-0000-0000-0000"
+      organization: "Department of Chemistry, TAMU "
+    }
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "6/4/2024, 10:53 AM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tamu.edu"
+      }
+    }
+  }
+  reaction_id: "ord-b36d7b14db744cd291c48bdbcf364b13"
+}
+dataset_id: "ord_dataset-f388f8c73d6343189093770060fc3097"

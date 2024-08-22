@@ -1,0 +1,174 @@
+reactions {
+  identifiers {
+    type: REACTION_TYPE
+    value: "Indole_Synthesis"
+  }
+  inputs {
+    key: "Ethyl_Acrylates"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "C=CC(OCC)=O"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        is_limiting: true
+      }
+      addition_order: 2
+    }
+  }
+  inputs {
+    key: "N-methylIndoles"
+    value {
+      components {
+        identifiers {
+          type: SMILES
+          value: "CN1C2=CC=CC=C2C=C1"
+        }
+        amount {
+          moles {
+            value: 1.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: REACTANT
+        is_limiting: true
+      }
+      addition_order: 1
+    }
+  }
+  setup {
+    vessel {
+      type: VIAL
+      material {
+        type: GLASS
+      }
+      attachments {
+        type: CAP
+      }
+      volume {
+        value: 0.0
+        units: MILLILITER
+      }
+    }
+    is_automated: false
+  }
+  conditions {
+    temperature {
+      control {
+        type: AMBIENT
+      }
+    }
+    pressure {
+      control {
+        type: SEALED
+      }
+      atmosphere {
+        type: AIR
+      }
+    }
+    stirring {
+      type: STIR_BAR
+      rate {
+        type: HIGH
+        details: "300"
+      }
+    }
+  }
+  workups {
+    type: ADDITION
+    input {
+      components {
+        identifiers {
+          type: NAME
+          value: "1-fluoronaphthalene"
+        }
+        identifiers {
+          type: SMILES
+          value: "C1=CC=C2C(=C1)C=CC=C2F"
+        }
+        amount {
+          moles {
+            value: 0.0
+            units: MILLIMOLE
+          }
+        }
+        reaction_role: INTERNAL_STANDARD
+      }
+      components {
+        identifiers {
+          type: NAME
+          value: "CDCl3"
+        }
+        identifiers {
+          type: SMILES
+          value: "[2H]C(Cl)(Cl)Cl"
+        }
+        amount {
+          volume {
+            value: 0.0
+            units: MICROLITER
+          }
+          volume_includes_solutes: true
+        }
+        reaction_role: WORKUP
+      }
+    }
+  }
+  outcomes {
+    reaction_time {
+      value: 48.0
+      units: HOUR
+    }
+    products {
+      identifiers {
+        type: SMILES
+        value: "CN1C=C(/C=C/C(OCC)=O)C2=C1C=CC=C2"
+      }
+      is_desired_product: true
+      measurements {
+        analysis_key: "NMR_1H"
+        type: YIELD
+        uses_internal_standard: true
+        percentage {
+          value: 39.0
+          precision: 4.8
+        }
+      }
+      reaction_role: PRODUCT
+    }
+    analyses {
+      key: "NMR_1H"
+      value {
+        type: NMR_OTHER
+        details: "NMR_1H"
+        is_of_isolated_species: false
+        instrument_manufacturer: "NMR_1H"
+      }
+    }
+  }
+  provenance {
+    city: "College Station"
+    doi: "10.1021/acs.joc.6b01138"
+    publication_url: "https://pubs.acs.org/doi/10.1021/acs.joc.6b01138#"
+    record_created {
+      time {
+        value: "8/8/2020, 3:01:25 PM"
+      }
+      person {
+        name: "THC"
+        orcid: "0000-0000-0000-0000"
+        organization: "TAMU"
+        email: "peterchao1@tmu.edu"
+      }
+    }
+  }
+reaction_id: "e1io3jkldsa"
+}
+dataset_id: "medb-1"
