@@ -75,10 +75,10 @@ button
     width: 18px !important
     margin: -5px !important
     box-shadow: none !important
-    background-color: #0d6efd !important
+    background-color: #500000 !important
   .bar-left, .bar-inner, .bar-right
     box-shadow: none !important
     border: grey 1px solid
   .bar-inner
-    background-color: #0d6efd !important
+    background-color: #500000 !important
 </style>

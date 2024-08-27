@@ -27,7 +27,7 @@ nav.navbar.navbar-expand-lg.bg-light
     a.navbar-brand(href="/")
       img(
         src="./CMCC_header_logo.png"
-        alt="ORD Logo"
+        alt="CMCC Logo"
         height="30"
       )
     #navbarNav.collapse.navbar-collapse
@@ -37,7 +37,7 @@ nav.navbar.navbar-expand-lg.bg-light
           router-link.nav-link(:to='{name: "search"}') Search
         .nav-item
           a.nav-link(href="/editor/") Contribute
-          a.nav-link(href="https://docs.open-reaction-database.org") Docs
+          a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") Docs
         .nav-item
           router-link.nav-link(:to='{name: "about"}') About
 </template>
