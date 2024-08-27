@@ -14,7 +14,7 @@ __pycache__
 *.sw[a-z]
 # build output
 **/build
-/dist
+#/dist
 # Folder tracking files
 .DS_Store
 # Test data.
