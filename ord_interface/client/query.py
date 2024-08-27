@@ -488,6 +488,78 @@ class DoiQuery(ReactionQueryBase):
         return fetch_results(cursor)
 
 
+class TreatmentQuery(ReactionQueryBase):
+    """Looks up reactions by DOI."""
+
+    valid_treatments = ["TWIN_SCREW", "HAND_GRIND", "AFM", "BALL_MILL"]
+
+    def __init__(self, treatments: List[str], liquid_assisted:bool=False) -> None:
+        """Initializes the query.
+
+        Args:
+            dois: List of DOIs.
+        """
+        self._dois = dois
+        self._treatments = treatments
+        self._liquid_assisted = liquid_assisted
+
+    def json(self) -> str:
+        """Returns a JSON representation of the query."""
+        return json.dumps({
+            "treatment_type": self._treatments,
+            "liquid_assisted": self._liquid_assisted
+        })
+
+    def validate(self) -> None:
+        """Checks the query for correctness.
+
+        Raises:
+            QueryException if the query is not valid.
+        """
+        valid_treatments = set(self.valid_treatments)
+        for i, treatment in enumerate(self._treatments):
+            if treatment not in valid_treatments:
+                raise QueryException(f"invalid treatment type: {treatment}") from error
+            # if doi != parsed:
+            #     # Trim the DOI as needed to match the database contents.
+            #     logger.info(f"Updating DOI: {doi} -> {parsed}")
+            #     self._dois[i] = parsed
+
+    def run(self, cursor: psycopg2.extensions.cursor, limit: Optional[int] = None) -> List[Result]:
+        """Runs the query.
+
+        Args:
+            cursor: psycopg2 cursor.
+            limit: Integer maximum number of matches. If None (the default), no
+                limit is set.
+
+        Returns:
+            List of Result instances.
+        """
+        components = [
+            sql.SQL(
+                """
+                SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
+                FROM ord.reaction
+                JOIN dataset ON dataset.id = reaction.dataset_id
+                JOIN reaction_provenance ON reaction_provenance.reaction_id = reaction.id
+                WHERE reaction_provenance.treatment_type = ANY (%s)""" + (
+                    """ AND reaction_provenance.liquid_assisted """
+                        if self._liquid_assisted else ""
+                ) + """
+                """
+            )
+        ]
+        args = [self._treatments]
+        if limit:
+            components.append(sql.SQL(" LIMIT %s"))
+            args.append(limit)
+        query = sql.Composed(components).join("")
+        logger.info("Running SQL command:%s", cursor.mogrify(query.as_string(cursor.connection), args).decode())
+        cursor.execute(query, args)
+        return fetch_results(cursor)
+
+
 class ReactionComponentQuery(ReactionQueryBase):
     """Matches reactions by reaction component predicates."""
 

@@ -222,6 +222,8 @@ def build_query() -> Tuple[List[query.ReactionQueryBase], Optional[int]]:
     use_stereochemistry = flask.request.args.get("use_stereochemistry")
     similarity = flask.request.args.get("similarity")
     limit = flask.request.args.get("limit")
+    treatment_type = flask.request.args.get("treatment_type")
+    liquid_assisted = flask.request.args.get("liquid_assisted")
     if limit is None:
         limit = MAX_RESULTS
     else:
@@ -239,6 +241,10 @@ def build_query() -> Tuple[List[query.ReactionQueryBase], Optional[int]]:
         queries.append(query.ReactionYieldQuery(min_yield, max_yield))
     if dois is not None:
         queries.append(query.DoiQuery(dois.split(",")))
+    if treatment_type is not None:
+        queries.append(
+            query.TreatmentQuery(treatment_type.split(","), liquid_assisted)
+        )
     if components:
         predicates = []
         for component in components:

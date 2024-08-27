@@ -26,7 +26,7 @@ nav.navbar.navbar-expand-lg.bg-light
   .container
     a.navbar-brand(href="/")
       img(
-        src="./CMCC_header_logo.png"
+        src="/img/header_logo.png"
         alt="CMCC Logo"
         height="30"
       )

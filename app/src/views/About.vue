@@ -29,19 +29,13 @@ export default {
             <h3>About</h3>
         </div>
         <div class="col-9 p-3">
-            <p style="text-align: justify; text-justify: inter-word;">
-                To be updated
-            </p>
-            <p style="text-align: justify; text-justify: inter-word;">
-                To be updated
-            </p>
-            <ul>
-                <li>To be updated</li>
-            </ul>
-            <p>
-                <a href="https://dtaborgroup.com/">Tabor group</a>
-                To be updated
-            </p>
+            The Center for the Mechanical Control of Chemistry Reactions Database is a prototyping fork of the 
+            <a href="https://open-reaction-database.org/">Open Reaction Database</a>
+            project with a focus on the addition of mechanochemical information.
+            As part of the work of the CMCC, the Database is maintained by the 
+            <a href="https://dtaborgroup.com">Tabor Group</a>
+
+            Learn more about the work of the Center <a href="https://www.chem.tamu.edu/cmcc/">here</a>
         </div>
     </div>
     <div class="row mt-5">
@@ -65,42 +59,10 @@ export default {
     </div>
     <div class="row mt-5">
         <div class="col-3 border-top pt-3">
-            <h3>Leadership</h3>
-        </div>
-        <div class="col-9 p-3">
-            <h5>Governing Committee</h5>
-            <div class="row">
-                <div class="col-6">
-                    <ul>
-                        <li>Daniel Tabor (TAMU)</li>
-                        <li>James Batteas (TAMU)</li>
-                    </ul>
-                </div>
-            </div>
-            <h5>Advisory Board</h5>
-            <div class="row">
-                <div class="col-6">
-                    <ul>
-                        <li>To be updated</li>
-                    </ul>
-                </div>
-                <div class="col-6">
-                    <ul>
-                        <li>To be updated</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="row mt-5">
-        <div class="col-3 border-top pt-3">
             <h3>Support</h3>
         </div>
         <div class="col-9 p-3">
-            <p>We gratefully acknowledge support from:</p>
-            <ul>
-                <li>NSF</li>
-            </ul>
+            <p>We gratefully acknowledge support from the NSF</p>
         </div>
     </div>
   </div>

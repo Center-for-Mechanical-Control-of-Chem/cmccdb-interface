@@ -32,6 +32,7 @@ export default {
       showReagentOptions: false,
       showReactionOptions: false,
       showDatasetOptions: false,
+      showMechanoOptions: false,
       reagentOptions: {
         reactants: [],
         products: [],
@@ -50,6 +51,10 @@ export default {
       datasetOptions: {
         datasetIds: [],
         DOIs: []
+      },
+      mechanoOptions: {
+        treatmentType: "",
+        liquidAssisted: false
       },
       searchParams: {
         limit: 100
@@ -126,6 +131,13 @@ export default {
       if (this.reactionOptions.reactionIds.length || this.reactionOptions.reactionSmarts.length || this.reactionOptions.yield !== 50 || this.reactionOptions.conversion !== 50) 
         this.showReactionOptions = true
 
+      
+      // general search params
+      this.mechanoOptions.treatmentType = q.treatment_type || ""
+      this.mechanoOptions.liquidAssisted = q.liquid_assisted || false
+      if (this.mechanoOptions.treatmentType || this.mechanoOptions.liquidAssisted) 
+        this.showMechanoOptions = true
+
       // general search params
       this.searchParams.limit = q.limit || 100
     },
@@ -142,6 +154,10 @@ export default {
     updateConversion (e) {
       this.reactionOptions.min_conversion = e.minValue
       this.reactionOptions.max_conversion = e.maxValue
+    },
+    updateMechTreatment (e) {
+      this.mechanoOptions.treatmentType = e.treatment_type
+      this.mechanoOptions.liquidAssisted = e.liquid_assisted
     }
   },
   mounted() {
@@ -281,6 +297,37 @@ export default {
           :maxValue='reactionOptions.max_conversion'
           @input='updateConversion'
         )
+  .options-title(
+    @click='showMechanoOptions = !showMechanoOptions'
+    :class='showMechanoOptions ? "" : "closed"'
+  ) 
+    span Mechanochemistry
+    i.material-icons expand_less
+  transition(name="expand")
+    #searchByMechano.options-container(
+      v-if='showMechanoOptions'
+    )
+      .section
+        .subtitle Treatment Type
+        .general.options
+          select#treatment(
+            type='selected'
+            v-model='mechanoOptions.treatmentType'
+            style="width:90%"
+            multiple
+          )
+            option(value="BALL_MILL") Ball Milling
+            option(value="AFM") AFM
+            option(value="HAND_GRIND") Hand Grinding
+            option(value="TWIN_SCREW") Twin Screw
+      .section
+        .subtitle Treatment Modifiers
+        .general.options
+          label(for='liquass' style='margin-right:15px') Liquid Assisted
+          input#liquass(
+            type='checkbox'
+            v-model='mechanoOptions.liquidAssisted'
+          )
   .options-title(
     @click='showDatasetOptions = !showDatasetOptions'
     :class='showDatasetOptions ? "" : "closed"'

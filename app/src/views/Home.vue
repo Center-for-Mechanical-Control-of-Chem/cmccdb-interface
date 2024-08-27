@@ -26,7 +26,7 @@ export default {
 <template lang="pug">
 .home
   .home-img
-    img( alt="CMCC logo" src="./Logo.png")
+    img( alt="CMCC logo" src="/img/banner.png")
 </template>
 
 <style lang="sass" scoped>
