@@ -53,7 +53,7 @@ export default {
         DOIs: []
       },
       mechanoOptions: {
-        treatmentType: "",
+        treatmentType: [],
         liquidAssisted: false
       },
       searchParams: {
@@ -97,7 +97,8 @@ export default {
         },
         reaction: this.reactionOptions,
         dataset: this.datasetOptions,
-        general: this.searchParams
+        general: this.searchParams,
+        mechano: this.mechanoOptions
       }
       this.$emit('searchOptions', searchOptions)
     },
@@ -133,9 +134,9 @@ export default {
 
       
       // general search params
-      this.mechanoOptions.treatmentType = q.treatment_type || ""
+      this.mechanoOptions.treatmentTypes = q.treatment_type?.split(",") || []
       this.mechanoOptions.liquidAssisted = q.liquid_assisted || false
-      if (this.mechanoOptions.treatmentType || this.mechanoOptions.liquidAssisted) 
+      if (this.mechanoOptions.treatmentTypes || this.mechanoOptions.liquidAssisted) 
         this.showMechanoOptions = true
 
       // general search params
@@ -156,7 +157,7 @@ export default {
       this.reactionOptions.max_conversion = e.maxValue
     },
     updateMechTreatment (e) {
-      this.mechanoOptions.treatmentType = e.treatment_type
+      this.mechanoOptions.treatmentTypes = e.treatment_type
       this.mechanoOptions.liquidAssisted = e.liquid_assisted
     }
   },
@@ -312,7 +313,7 @@ export default {
         .general.options
           select#treatment(
             type='selected'
-            v-model='mechanoOptions.treatmentType'
+            v-model='mechanoOptions.treatmentTypes'
             style="width:90%"
             multiple
           )

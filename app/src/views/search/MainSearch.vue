@@ -79,6 +79,20 @@ export default {
         this.searchParams["component"] = []
       }
 
+      // mechano options
+      if (options.mechano.treatmentTypes.length)
+        this.searchParams["treatment_type"] = options.mechano.treatmentTypes.join(",")
+      else
+        delete this.searchParams["treatment_type"]
+      if (options.mechano.liquidAssisted)
+        this.searchParams["liquid_assisted"] = options.mechano.liquidAssisted
+      else
+        delete this.searchParams["liquid_assisted"]
+      if (options.dataset.DOIs.length)
+        this.searchParams["dois"] = options.dataset.DOIs.join(",")
+      else
+        delete this.searchParams["dois"]
+
       // dataset options
       if (options.dataset.datasetIds.length)
         this.searchParams["dataset_ids"] = options.dataset.datasetIds.join(",")

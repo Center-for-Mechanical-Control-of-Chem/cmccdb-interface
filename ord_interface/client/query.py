@@ -516,6 +516,7 @@ class TreatmentQuery(ReactionQueryBase):
         Raises:
             QueryException if the query is not valid.
         """
+
         valid_treatments = set(self.valid_treatments)
         for i, treatment in enumerate(self._treatments):
             if treatment not in valid_treatments:
