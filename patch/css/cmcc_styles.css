@@ -1,0 +1,44 @@
+
+html {
+
+    --lightgrey: #f8f9fa;
+    --medgrey: #e8e9e3;
+    --darkgrey: #a0a0a0;
+    --linkblue: #500000;
+    --hoverblue: #500000;
+    --white: #fff;
+}
+
+.cmcc-content-pane {
+    background-color: var(--lightgrey);
+}
+
+.bg-header{
+    background-color: var(--white);
+}
+
+#main-container {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-width: 800px;
+    width: 100%;
+}
+#main-container.full-height {
+    grid-template-rows: 1fr
+}
+
+.nav-link {
+    color: var(--linkblue);
+}
+
+button.nav-link.active {
+    background-color: var(--linkblue);
+    color: var(--lightgrey);
+}
+.nav-pills .nav-link.active {
+    background-color: var(--linkblue);
+}
+
+
+
+
