@@ -501,7 +501,7 @@ class TreatmentQuery(ReactionQueryBase):
         """
         self._dois = dois
         self._treatments = treatments
-        self._liquid_assisted = liquid_assisted
+        self._liquid_assisted = bool(liquid_assisted)
 
     def json(self) -> str:
         """Returns a JSON representation of the query."""
