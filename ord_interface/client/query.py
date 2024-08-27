@@ -499,7 +499,6 @@ class TreatmentQuery(ReactionQueryBase):
         Args:
             dois: List of DOIs.
         """
-        self._dois = dois
         self._treatments = treatments
         self._liquid_assisted = bool(liquid_assisted)
 
