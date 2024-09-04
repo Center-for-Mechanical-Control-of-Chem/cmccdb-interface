@@ -47,7 +47,7 @@ export default {
         return alert("You must upload a file for the dataset before submitting.")
       // send dataset file to api for upload
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/dataset/${this.uploadFile.name}/upload`);
+      xhr.open('POST', `/editor/dataset/${this.uploadFile.name}/upload`);
       const payload = this.uploadFile.value
       xhr.onload = () => {
         if (xhr.status === 200) {
