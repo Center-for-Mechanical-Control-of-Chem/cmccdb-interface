@@ -98,7 +98,7 @@ def upload_dataset():
         flask.abort(flask.make_response(str(error), 406))
 
 @bp.route("/api/delete/<dataset_id>", methods=["POST"])
-def upload_dataset(dataset_id):
+def delete_dataset(dataset_id):
     """Writes the request body to the datasets table without validation."""
     try:
         # try:
