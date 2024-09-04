@@ -489,9 +489,9 @@ class DoiQuery(ReactionQueryBase):
 
 
 class TreatmentQuery(ReactionQueryBase):
-    """Looks up reactions by DOI."""
+    """Looks up reactions by Mechanochemical treatment."""
 
-    valid_treatments = ["TWIN_SCREW", "HAND_GRIND", "AFM", "BALL_MILL"]
+    valid_treatments = ["TWIN_SCREW", "HAND_GRIND", "TIP_ARRAY", "BALL_MILL"]
 
     def __init__(self, treatments: List[str], liquid_assisted:bool=False) -> None:
         """Initializes the query.
@@ -542,9 +542,10 @@ class TreatmentQuery(ReactionQueryBase):
                 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
                 FROM ord.reaction
                 JOIN dataset ON dataset.id = reaction.dataset_id
-                JOIN reaction_provenance ON reaction_provenance.reaction_id = reaction.id
-                WHERE reaction_provenance.treatment_type = ANY (%s)""" + (
-                    """ AND reaction_provenance.liquid_assisted """
+                JOIN ord.reaction_outcome on reaction_outcome.reaction_id = reaction.id
+                WHERE mechanochemistry_conditions.type = ANY (%s)""" + (
+                    """ 
+                    AND mechanochemistry_conditions.liquid_assisted """
                         if self._liquid_assisted else ""
                 ) + """
                 """

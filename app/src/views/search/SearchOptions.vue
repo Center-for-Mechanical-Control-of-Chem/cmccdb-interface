@@ -318,7 +318,7 @@ export default {
             multiple
           )
             option(value="BALL_MILL") Ball Milling
-            option(value="AFM") AFM
+            option(value="TIP_ARRAY") Tip Array
             option(value="HAND_GRIND") Hand Grinding
             option(value="TWIN_SCREW") Twin Screw
       .section
