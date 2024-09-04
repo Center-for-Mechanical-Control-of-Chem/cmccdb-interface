@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Entrypoint for the web interface."""
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__))) # allow ord_schema to be hot patched
+
 import flask
 
 # TODO(skearnes): Figure out how to use this.

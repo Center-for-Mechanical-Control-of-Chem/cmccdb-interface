@@ -32,6 +32,7 @@ services:
     ports:
       - "80:80"
     volumes:
+      - /home/cmccdb-schema/ord_schema:/app/ord-interface/ord_schema:z
       - /home/cmccdb-interface/patch:/app/ord-interface/vue:z
       - /home/cmccdb-interface/ord_interface/editor/html/datasets.html:/app/ord-interface/ord_interface/editor/html/datasets.html:z
       - /home/cmccdb-interface/ord_interface/editor/py/serve.py:/app/ord-interface/ord_interface/editor/py/serve.py:z
