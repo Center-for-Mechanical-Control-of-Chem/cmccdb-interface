@@ -65,15 +65,15 @@ from .. import client
 
 def get_session():
     connection_string = database.get_connection_string(
-        database=POSTGRES_HOST or client.POSTGRES_DB,
+        database=POSTGRES_DATABASE or client.POSTGRES_DB,
         username=POSTGRES_USER or client.POSTGRES_USER,
         password=POSTGRES_PASSWORD or client.POSTGRES_PASSWORD,
         host=POSTGRES_HOST,
         port=POSTGRES_PORT or client.POSTGRES_PORT,
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
-    with engine.begin() as connection:  # pytype: disable=attribute-error
-        connection.execute(sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))
+    # with engine.begin() as connection:  # pytype: disable=attribute-error
+    #     connection.execute(sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))
     database.prepare_database(engine)
     return orm.Session(engine)
 
