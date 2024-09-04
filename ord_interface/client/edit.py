@@ -54,7 +54,7 @@ from ord_schema.orm import database
 from google.protobuf import text_format  # pytype: disable=import-error
 from ord_schema.proto import dataset_pb2, reaction_pb2
 
-bp = flask.Blueprint("client", __name__, url_prefix="/client", template_folder=".")
+bp = flask.Blueprint("edit", __name__, url_prefix="/client", template_folder=".")
 POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "ord-postgres")
