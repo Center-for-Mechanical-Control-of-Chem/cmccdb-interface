@@ -34,7 +34,9 @@ services:
     volumes:
       - /home/cmccdb-schema/ord_schema:/app/ord-interface/ord_schema:z
       - /home/cmccdb-interface/patch:/app/ord-interface/vue:z
+      - /home/cmccdb-interface/ord_interface/interface.py:/app/ord-interface/ord_interface/interface.py:z
       - /home/cmccdb-interface/ord_interface/editor/html/datasets.html:/app/ord-interface/ord_interface/editor/html/datasets.html:z
       - /home/cmccdb-interface/ord_interface/editor/py/serve.py:/app/ord-interface/ord_interface/editor/py/serve.py:z
       - /home/cmccdb-interface/ord_interface/client/search.py:/app/ord-interface/ord_interface/client/search.py:z
       - /home/cmccdb-interface/ord_interface/client/query.py:/app/ord-interface/ord_interface/client/query.py:z
+      - /home/cmccdb-interface/ord_interface/client/edit.py:/app/ord-interface/ord_interface/client/edit.py:z
