@@ -39,7 +39,6 @@ const routes =
         name : 'search',
         component : () => import('../views/search/MainSearch.vue')
       },
-
       {
         path : '/editor',
         name : 'contribute',

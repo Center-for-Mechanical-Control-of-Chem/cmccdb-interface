@@ -46,7 +46,7 @@ export default {
     const notFirstTime = localStorage.getItem('notFirstTime')
     if (!notFirstTime) {
       localStorage.setItem("notFirstTime", "false")
-      this.activeTab = "Get Started"
+      this.activeTab = "Introduction"
     }
     this.loading = false
   },
