@@ -88,7 +88,7 @@ def show_datasets():
     """Lists all the user's datasets in the datasets table."""
     names = []
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("SELECT name FROM datasets WHERE user_id=%s")
+        query = psycopg2.sql.SQL("SELECT name FROM dataset WHERE user_id=%s")
         cursor.execute(query, [flask.g.user_id])
         print("flask user id", flask.g.user_id)
         for row in cursor:
@@ -112,7 +112,7 @@ def get_datasets_by_id(user_id):
     print("flask user id", user_id)
     names = []
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("SELECT name FROM datasets WHERE user_id=%s")
+        query = psycopg2.sql.SQL("SELECT name FROM dataset WHERE user_id=%s")
         cursor.execute(query, [user_id])
         for row in cursor:
             names.append(row[0])
@@ -178,7 +178,7 @@ def upload_dataset(name):
             text_format.Parse(flask.request.get_data(as_text=True), dataset)
         user_id = flask.g.user_id
         with flask.g.db.cursor() as cursor:
-            query = psycopg2.sql.SQL("INSERT INTO datasets (user_id, name, serialized) VALUES (%s, %s, %s)")
+            query = psycopg2.sql.SQL("INSERT INTO dataset (user_id, name, serialized) VALUES (%s, %s, %s)")
             cursor.execute(query, [user_id, name, serialize_for_db(dataset)])
             flask.g.db.commit()
         return "ok"
@@ -193,7 +193,7 @@ def new_dataset(name):
         response = flask.make_response(f"dataset already exists: {name}", 409)
         flask.abort(response)
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("INSERT INTO datasets (user_id, name, serialized) VALUES (%s, %s, %s)")
+        query = psycopg2.sql.SQL("INSERT INTO dataset (user_id, name, serialized) VALUES (%s, %s, %s)")
         user_id = flask.g.user_id
         cursor.execute(query, [user_id, name, ""])
         flask.g.db.commit()
@@ -204,7 +204,7 @@ def new_dataset(name):
 def delete_dataset(name):
     """Removes a Dataset."""
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("DELETE FROM datasets WHERE user_id=%s AND name=%s")
+        query = psycopg2.sql.SQL("DELETE FROM dataset WHERE user_id=%s AND name=%s")
         user_id = flask.g.user_id
         cursor.execute(query, [user_id, name])
         flask.g.db.commit()
@@ -584,7 +584,7 @@ def show_submissions():
         return flask.redirect(flask.url_for(".show_root"))
     pull_requests = collections.defaultdict(list)
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("SELECT name FROM datasets WHERE user_id=%s")
+        query = psycopg2.sql.SQL("SELECT name FROM dataset WHERE user_id=%s")
         cursor.execute(query, [REVIEWER])
         for row in cursor:
             name = row[0]
@@ -610,7 +610,7 @@ def sync_reviews():
     user_id = flask.g.user_id
     with flask.g.db.cursor() as cursor:
         # First reset all datasets under review.
-        query = psycopg2.sql.SQL("DELETE FROM datasets WHERE user_id=%s")
+        query = psycopg2.sql.SQL("DELETE FROM dataset WHERE user_id=%s")
         cursor.execute(query, [REVIEWER])
         # Then import all datasets from open PR's.
         for pr in repo.get_pulls():
@@ -625,7 +625,7 @@ def sync_reviews():
                     continue
                 prefix = remote.filename[:-6]
                 name = f"PR_{pr.number} ___{pr.title}___ {prefix}"
-                query = psycopg2.sql.SQL("INSERT INTO datasets (user_id, name, serialized) VALUES (%s, %s, %s)")
+                query = psycopg2.sql.SQL("INSERT INTO dataset (user_id, name, serialized) VALUES (%s, %s, %s)")
                 cursor.execute(query, [user_id, name, serialize_for_db(dataset)])
     flask.g.db.commit()
     return flask.redirect(flask.url_for(".show_submissions"))
@@ -646,7 +646,7 @@ def prevent_caching(response):
 def get_dataset(name):
     """Reads a serialized proto from the datasets table and parses it."""
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("SELECT serialized FROM datasets WHERE user_id=%s AND name=%s")
+        query = psycopg2.sql.SQL("SELECT serialized FROM dataset WHERE user_id=%s AND name=%s")
         cursor.execute(query, [flask.g.user_id, name])
         if cursor.rowcount == 0:
             flask.abort(404)
@@ -658,7 +658,7 @@ def put_dataset(name, dataset):
     """Write a dataset proto to the dataset table, clobbering if needed."""
     with flask.g.db.cursor() as cursor:
         query = psycopg2.sql.SQL(
-            "INSERT INTO datasets (user_id, name, serialized) VALUES (%s, %s, %s) "
+            "INSERT INTO dataset (user_id, name, serialized) VALUES (%s, %s, %s) "
             "ON CONFLICT (user_id, name) DO UPDATE SET serialized=%s"
         )
         user_id = flask.g.user_id
@@ -777,7 +777,7 @@ def get_path(file_name, suffix=""):
 def exists_dataset(name):
     """True if a dataset with the given name is defined for the current user."""
     with flask.g.db.cursor() as cursor:
-        query = psycopg2.sql.SQL("SELECT 1 FROM datasets WHERE user_id=%s AND name=%s")
+        query = psycopg2.sql.SQL("SELECT 1 FROM dataset WHERE user_id=%s AND name=%s")
         user_id = flask.g.user_id
         cursor.execute(query, [user_id, name])
         return cursor.rowcount > 0
