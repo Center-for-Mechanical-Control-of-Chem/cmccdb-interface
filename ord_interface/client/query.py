@@ -544,7 +544,7 @@ class TreatmentQuery(ReactionQueryBase):
                 JOIN dataset ON dataset.id = reaction.dataset_id
                 JOIN ord.reaction_conditions on reaction_conditions.reaction_id = reaction.id
                 JOIN ord.mechanochemistry_conditions on mechanochemistry_conditions.reaction_conditions_id = reaction_conditions.id
-                WHERE mechanochemistry_conditions.type = ANY (%s)""" + (
+                WHERE CAST(mechanochemistry_conditions.type AS text) = ANY (%s)""" + (
                     """ 
                     AND mechanochemistry_conditions.liquid_assisted """
                         if self._liquid_assisted else ""
