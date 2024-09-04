@@ -542,10 +542,11 @@ class TreatmentQuery(ReactionQueryBase):
                 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
                 FROM ord.reaction
                 JOIN dataset ON dataset.id = reaction.dataset_id
-                JOIN ord.reaction_outcome on reaction_outcome.reaction_id = reaction.id
-                WHERE ord.mechanochemistry_conditions.type = ANY (%s)""" + (
+                JOIN ord.reaction_conditions on reaction_conditions.reaction_id = reaction.id
+                JOIN ord.mechanochemistry_conditions on mechanochemistry_conditions.reaction_conditions_id = reaction_conditions.id
+                WHERE mechanochemistry_conditions.type = ANY (%s)""" + (
                     """ 
-                    AND ord.mechanochemistry_conditions.liquid_assisted """
+                    AND mechanochemistry_conditions.liquid_assisted """
                         if self._liquid_assisted else ""
                 ) + """
                 """
