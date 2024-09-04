@@ -71,13 +71,13 @@ export default {
         details.push(`under ${pressureSetPoint}`)
 
       // get duration
-      const formattedTime = outcomesUtil.formattedTime(reaction.outcomesList[0].reactionTime)
-      if (formattedTime)
+      const formattedTime = outcomesUtil.formattedTime(reaction.outcomesList[0]?.reactionTime)
+      if (formattedTime !== "None")
         details.push(`for ${formattedTime}`)
 
       // get stir
-      const stirType = conditionUtil.stirType(reaction.conditions.stirring.type)
-      if (stirType)
+      const stirType = conditionUtil.stirType(reaction.conditions.stirring?.type)
+      if (stirType !== "None")
         details.push(`under ${stirType}`)
 
       return details
