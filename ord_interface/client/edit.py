@@ -77,6 +77,16 @@ def get_session():
     engine = get_engine()
     database.prepare_database(engine)
     return orm.Session(engine)
+def get_isolated_connection():
+    import psycopg2
+
+    return psycopg2.connect(
+        dbname=POSTGRES_DATABASE,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT, options="-c search_path=public,ord"
+    )
+
+
 
 @bp.route("/api/upload", methods=["POST"])
 def upload_dataset():
@@ -101,8 +111,14 @@ def upload_dataset():
 @bp.route("/api/reconfigure", methods=["POST"])
 def reconfigure_database():
     """Writes the request body to the datasets table without validation."""
+
     try:
-        database.reconfigure_databse(get_engine())
+        conn = get_isolated_connection()
+        with conn.cursor() as cur:
+            conn.autocommit = True
+            cur.execute("DROP DATABASE IF EXISTS ord;")
+            cur.execute("CREATE DATABASE ord;")
+        database.prepare_database(get_engine())
         return "ok"
     except Exception as error:  # pylint: disable=broad-except
         flask.abort(flask.make_response(str(error), 406))
