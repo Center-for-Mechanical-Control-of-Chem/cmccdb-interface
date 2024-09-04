@@ -81,7 +81,7 @@ def get_isolated_connection():
     import psycopg2
 
     return psycopg2.connect(
-        dbname=POSTGRES_DATABASE,
+        # dbname=POSTGRES_DATABASE,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT, options="-c search_path=public,ord"
     )
