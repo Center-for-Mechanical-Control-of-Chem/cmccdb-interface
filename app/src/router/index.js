@@ -40,7 +40,7 @@ const routes =
         component : () => import('../views/search/MainSearch.vue')
       },
       {
-        path : '/editor',
+        path : '/contribute',
         name : 'contribute',
         component : () => import('../views/contribute/MainContribute.vue')
       },
