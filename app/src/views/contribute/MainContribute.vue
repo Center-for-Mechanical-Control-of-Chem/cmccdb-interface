@@ -19,13 +19,15 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import Enumerate from "./EnumerateView"
 import Upload from "./UploadView"
 import Datasets from "./DatasetsView"
+import Reconfigure from "./ReconfigureView"
 
 export default {
   components: {
     LoadingSpinner,
     Enumerate,
     Upload,
-    Datasets
+    Datasets,
+    Reconfigure
   },
   data() {
     return {
@@ -47,6 +49,9 @@ export default {
     if (!notFirstTime) {
       localStorage.setItem("notFirstTime", "false")
       this.activeTab = "Introduction"
+    }
+    if (this.$route.query.active_tab) {
+        this.activeTab = this.$route.query.active_tab
     }
     this.loading = false
   },
@@ -78,6 +83,8 @@ export default {
                 | &nbsp; script in the main repository.
         transition(name="fade")
           Upload(v-if='activeTab == "Upload"')
+        transition(name="fade")
+          Reconfigure(v-if='activeTab == "Reconfigure"')
 
 </template>
 

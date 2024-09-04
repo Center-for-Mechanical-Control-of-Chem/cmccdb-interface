@@ -63,7 +63,7 @@ POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "ord")
 
 from .. import client
 
-def get_session():
+def get_engine():
     connection_string = database.get_connection_string(
         database=POSTGRES_DATABASE or client.POSTGRES_DB,
         username=POSTGRES_USER or client.POSTGRES_USER,
@@ -72,8 +72,9 @@ def get_session():
         port=POSTGRES_PORT or client.POSTGRES_PORT,
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
-    # with engine.begin() as connection:  # pytype: disable=attribute-error
-    #     connection.execute(sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS tsm_system_rows"))
+    return engine
+def get_session():
+    engine = get_engine()
     database.prepare_database(engine)
     return orm.Session(engine)
 
@@ -93,6 +94,15 @@ def upload_dataset():
             # session.flush()
             # database.update_rdkit_ids(dataset.dataset_id, session=session)
             session.commit()
+        return "ok"
+    except Exception as error:  # pylint: disable=broad-except
+        flask.abort(flask.make_response(str(error), 406))
+
+@bp.route("/api/reconfigure", methods=["POST"])
+def reconfigure_database():
+    """Writes the request body to the datasets table without validation."""
+    try:
+        database.reconfigure_databse(get_engine())
         return "ok"
     except Exception as error:  # pylint: disable=broad-except
         flask.abort(flask.make_response(str(error), 406))
