@@ -68,7 +68,7 @@ def get_session():
         database=POSTGRES_HOST or client.POSTGRES_DB,
         username=POSTGRES_USER or client.POSTGRES_USER,
         password=POSTGRES_PASSWORD or client.POSTGRES_PASSWORD,
-        # host=None,
+        host=POSTGRES_HOST,
         port=POSTGRES_PORT or client.POSTGRES_PORT,
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
