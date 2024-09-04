@@ -285,6 +285,7 @@ limitations under the License.
             reader.readAsArrayBuffer(file);
             reader.onload = event => {
                 const xhr = new XMLHttpRequest();
+                console.log(root + 'dataset/' + file.name + '/upload');
                 xhr.open('POST', root + 'dataset/' + file.name + '/upload');
                 const payload = event.target.result;
                 xhr.onload = () => {
