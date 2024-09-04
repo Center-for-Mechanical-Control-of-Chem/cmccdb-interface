@@ -67,5 +67,10 @@ export default {
     const illumType =
         Object.keys(illumTypes).find(key => illumTypes[key] == illum.type)
     return `${illumType}${illum.details ? `: ${illum.details}` : ""}`
-  }
+  },
+  mechType(mechanoChemType) {
+    const controlTypes = reaction_pb.MechanochemistryConditions.MechanochemistryType
+    return Object.keys(controlTypes)
+        .find(key => controlTypes[key] == mechanoChemType)
+  },
 }
