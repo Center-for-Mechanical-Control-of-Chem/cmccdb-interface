@@ -79,7 +79,12 @@ export default {
       )
   .submit
     button#upload-submit(@click='submitUpload') Submit Upload
-  .copy Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec tincidunt eros eget magna venenatis, nec volutpat justo ornare. Praesent mauris enim, dignissim nec posuere ut, mollis at lacus. Phasellus ut ultricies arcu, ultrices efficitur enim. Donec pharetra turpis nulla, id elementum felis fermentum sit amet. In id imperdiet sapien. Quisque vulputate odio eget ex aliquet aliquam. Vestibulum a metus magna.
+  .copy Choose a &nbsp;
+                code() .pbtxt
+                | &nbsp; file compiled with the &nbsp;
+                code() construct_dataset.py
+                | &nbsp; script in the &nbsp;
+                a(href="https://github.com/Center-for-Mechanical-Control-of-Chem/cmccdb-schema") cmccdb-schema repository
 </template>
 
 <style lang="sass" scoped>

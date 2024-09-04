@@ -39,6 +39,12 @@ const routes =
         name : 'search',
         component : () => import('../views/search/MainSearch.vue')
       },
+
+      {
+        path : '/editor',
+        name : 'contribute',
+        component : () => import('../views/contribute/MainContribute.vue')
+      },
       {
         path : '/id/:reactionId',
         name : 'reaction-view',

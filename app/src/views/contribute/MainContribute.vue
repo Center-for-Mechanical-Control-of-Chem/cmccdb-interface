@@ -31,12 +31,10 @@ export default {
     return {
       loading: true,
       tabs: [
-        "Get Started",
-        "Datasets",
+        "Introduction",
         "Upload",
-        "Enumerate"
       ],
-      activeTab: "Datasets",
+      activeTab: "Upload",
     }
   },
   computed: {
@@ -71,50 +69,15 @@ export default {
             :class='activeTab == tab ? "selected" : ""'
           ) {{tab}}
         transition(name="fade")
-          .get-started(v-if='activeTab == "Get Started"')
-            .copy Check out these 
-              a(href="https://www.youtube.com/playlist?list=PLyoEVAlMb276aRRa4xLNRAzbMPRlNb7VI") tutorial videos 
-              | for a guide on how to use the ORD Editor.
-            .tutorial-videos
-              .video
-                .subtitle Using the interactive web editor (updated 1/2021)
-                iframe(
-                  width='560'
-                  height='315'
-                  src='https://www.youtube.com/embed/5J-2j8aBXMo'
-                  title='YouTube video player'
-                  frameborder='0'
-                  allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-                  allowfullscreen
-                )
-              .video
-                .subtitle Submitting your first Dataset
-                iframe(
-                  width='560'
-                  height='315'
-                  src='https://www.youtube.com/embed/sAdSKKdO9Gs'
-                  title='YouTube video player'
-                  frameborder='0'
-                  allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
-                  allowfullscreen
-                )
-            .copy Please send any questions, comments, or issues to 
-              a(
-                href='https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=help@open-reaction-database.org'
-                target="_blank"
-              ) help@open-reaction-database.org 
-              | or create a new issue on the 
-              a(
-                href='https://github.com/Open-Reaction-Database/ord-interface/issues'
-                target="_blank"
-              ) ord-interface GitHub repository
-              | .
-        transition(name="fade")
-          Datasets(v-if='activeTab == "Datasets"')
+          .get-started(v-if='activeTab == "Introduction"')
+            .copy We have adapted the ORD submission template to support a single-file workflow.
+                All submissions are driven by a single spreadsheet file which is compiled down to a &nbsp;
+                code() .pbtxt
+                | &nbsp; file with the &nbsp;
+                code() construct_dataset.py
+                | &nbsp; script in the main repository.
         transition(name="fade")
           Upload(v-if='activeTab == "Upload"')
-        transition(name="fade")
-          Enumerate(v-if='activeTab == "Enumerate"')
 
 </template>
 

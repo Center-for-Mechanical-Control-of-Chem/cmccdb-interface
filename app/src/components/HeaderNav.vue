@@ -35,9 +35,9 @@ nav.navbar.navbar-expand-lg.bg-light
         .nav-item
           router-link.nav-link(:to='{name: "browse"}') Browse
           router-link.nav-link(:to='{name: "search"}') Search
+          router-link.nav-link(:to='{name: "contribute"}') Contribute
         .nav-item
-          a.nav-link(href="/editor/") Contribute
-          a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") Docs
+          a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") GitHub
         .nav-item
           router-link.nav-link(:to='{name: "about"}') About
 </template>
