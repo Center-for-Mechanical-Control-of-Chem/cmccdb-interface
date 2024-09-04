@@ -22,7 +22,7 @@ import flask
 
 from ord_interface.client import search
 from ord_interface.client import edit
-# from ord_interface.editor.py import serve
+from ord_interface.editor.py import serve
 from ord_interface.visualization import filters
 
 # Set the ketcher distribution as the static folder.
@@ -34,7 +34,7 @@ app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
 app.jinja_env.filters.update(filters.TEMPLATE_FILTERS)  # pylint: disable=no-member
 app.register_blueprint(search.bp)
 app.register_blueprint(edit.bp)
-# app.register_blueprint(serve.bp)
+app.register_blueprint(serve.bp)
 
 
 @app.route("/ketcher")
