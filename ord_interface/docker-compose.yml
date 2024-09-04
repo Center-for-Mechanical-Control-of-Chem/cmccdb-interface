@@ -33,6 +33,7 @@ services:
       - "80:80"
     volumes:
       - /home/cmccdb-interface/patch:/app/ord-interface/vue:z
+      - /home/cmccdb-interface/ord_interface/editor/html/datasets.html:/app/ord-interface/ord_interface/editor/html/datasets.html:z
       - /home/cmccdb-interface/ord_interface/editor/py/serve.py:/app/ord-interface/ord_interface/editor/py/serve.py:z
       - /home/cmccdb-interface/ord_interface/client/search.py:/app/ord-interface/ord_interface/client/search.py:z
       - /home/cmccdb-interface/ord_interface/client/query.py:/app/ord-interface/ord_interface/client/query.py:z
