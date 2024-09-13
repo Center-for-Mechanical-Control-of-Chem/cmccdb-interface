@@ -18,7 +18,7 @@
 import SearchOptions from './SearchOptions'
 import SearchResults from './SearchResults'
 import LoadingSpinner from '@/components/LoadingSpinner'
-import reaction_pb from "ord-schema"
+import reaction_pb from "cmccdb-schema"
 import hexToUint from "@/utils/hexToUint"
 
 export default {
