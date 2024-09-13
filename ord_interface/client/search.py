@@ -62,15 +62,16 @@ BOND_LENGTH = 20
 MAX_RESULTS = 1000
 
 
-def _run_query(commands: list[query.ReactionQueryBase], limit: int | None) -> list[query.Result]:
+def _run_query(database_name: str | None, commands: list[query.ReactionQueryBase], limit: int | None) -> list[query.Result]:
+
     """Runs a query and returns the matched reactions."""
     if len(commands) == 0:
         results = []
     elif len(commands) == 1:
-        results = connect().run_query(commands[0], limit=limit)
+        results = connect(database_name).run_query(commands[0], limit=limit)
     else:
         # Perform each query without limits and take the intersection of matched reactions.
-        connection = connect()
+        connection = connect(database_name)
         reactions = {}
         intersection = None
         for command in commands:
@@ -89,7 +90,9 @@ def _run_query(commands: list[query.ReactionQueryBase], limit: int | None) -> li
 @bp.route("/id/<reaction_id>")
 def show_id(reaction_id):
     """Returns the pbtxt of a single reaction as plain text."""
-    results = connect().run_query(query.ReactionIdQuery([reaction_id]))
+    database_name = flask.request.args.get("database")
+
+    results = connect(database_name).run_query(query.ReactionIdQuery([reaction_id]))
     if len(results) == 0:
         return flask.abort(404)
     reaction = results[0].reaction
@@ -106,8 +109,10 @@ def show_id(reaction_id):
 @bp.route("/api/render/<reaction_id>")
 def render_reaction(reaction_id):
     """Renders a reaction as an HTML table with images and text."""
+    database_name = flask.request.args.get("database")
+
     command = query.ReactionIdQuery([reaction_id])
-    results = connect().run_query(command)
+    results = connect(database_name).run_query(command)
     compact = flask.request.args.get("compact") != "false"  # defaults to true
     print("compact", compact)
     if len(results) == 0 or len(results) > 1:
@@ -133,9 +138,11 @@ def render_compound():
         return flask.jsonify("[Compound cannot be displayed]")
 
 
-def connect():
+def connect(database_name):
+    if database_name is None:
+        database_name = POSTGRES_DATABASE
     return query.OrdPostgres(
-        dbname=POSTGRES_DATABASE,
+        dbname=database_name,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
         host=POSTGRES_HOST,
@@ -156,11 +163,13 @@ def prep_results_for_json(results: list[query.Result]) -> list[dict]:
 @bp.route("/api/fetch_reactions", methods=["POST"])
 def fetch_reactions():
     """Fetches a list of Reactions by ID."""
+    database_name = flask.request.args.get("database")
+
     print("request", flask.request.get_json())
     reaction_ids = flask.request.get_json()
     command = query.ReactionIdQuery(reaction_ids)
     try:
-        results = connect().run_query(command)
+        results = connect(database_name).run_query(command)
         return flask.jsonify(prep_results_for_json(results))
     except query.QueryException as error:
         return flask.abort(flask.make_response(str(error), 400))
@@ -169,7 +178,9 @@ def fetch_reactions():
 @bp.route("/api/fetch_datasets", methods=["GET"])
 def fetch_datasets():
     """Fetches info about the current datasets."""
-    engine = connect()
+    database_name = flask.request.args.get("database")
+
+    engine = connect(database_name)
     rows = {}
     with engine.connection, engine.cursor() as cursor:
         cursor.execute("SELECT id, dataset_id, name, description FROM dataset")
@@ -194,11 +205,13 @@ def run_query():
     Returns:
         A serialized Dataset proto containing the matched reactions.
     """
+    database_name = flask.request.args.get("database")
+
     commands, limit = build_query()
     if len(commands) == 0:
         return flask.abort(flask.make_response("no query defined", 400))
     try:
-        return flask.jsonify(prep_results_for_json(_run_query(commands, limit)))
+        return flask.jsonify(prep_results_for_json(_run_query(database_name, commands, limit)))
     except query.QueryException as error:
         return flask.abort(flask.make_response(str(error), 400))
 
@@ -277,10 +290,12 @@ def get_molfile():
 @bp.route("/api/download_results", methods=["POST"])
 def download_results():
     """Downloads search results as a Dataset proto."""
+    database_name = flask.request.args.get("database")
+
     reaction_ids = [row["Reaction ID"] for row in flask.request.get_json()]
     command = query.ReactionIdQuery(reaction_ids[:MAX_RESULTS])
     try:
-        results = connect().run_query(command)
+        results = connect(database_name).run_query(command)
     except query.QueryException as error:
         return flask.abort(flask.make_response(str(error), 400))
     dataset = dataset_pb2.Dataset(name="ORD Search Results", reactions=[result.reaction for result in results])

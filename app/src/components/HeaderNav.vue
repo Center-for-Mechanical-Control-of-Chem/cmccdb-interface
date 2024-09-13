@@ -40,6 +40,7 @@ nav.navbar.navbar-expand-lg.bg-light
           a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") GitHub
         .nav-item
           router-link.nav-link(:to='{name: "about"}') About
+div.alt-dataset(:class="{ 'alt-visible' : $route.query.database }") Viewing a Secondary Database
 </template>
 
 <style lang="sass" scoped>
@@ -66,7 +67,19 @@ nav
             padding: 0.5rem
             text-decoration: none
             transition: .15s
-            color: $linkblue
+            color: $bg-primary
             &:hover
-              color: $hoverblue
+              color: $bg-secondary
+.alt-dataset
+  text-align: center
+  font-size: 1.5rem
+  font-variant: bold
+  background: $bg-primary
+  color: $text-primary
+  display: none
+  width: 100%
+  padding: 2rem
+  height: 6rem
+.alt-visible
+  display: block
 </style>

@@ -26,7 +26,7 @@ from ord_schema.proto import reaction_pb2
 
 from ord_interface.client import query
 
-TARGET = "https://open-reaction-database.org"
+TARGET = "https://mechanochemistry.chem.tamu.edu"
 
 
 def parse_response(response: requests.Response) -> list[query.Result]:

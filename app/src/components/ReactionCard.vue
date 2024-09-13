@@ -196,5 +196,5 @@ export default {
           overflow: hidden
           text-overflow: ellipsis
     &.selected
-      border-color: $linkblue
+      border-color: $bg-primary
 </style>

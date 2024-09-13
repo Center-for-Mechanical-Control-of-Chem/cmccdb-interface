@@ -52,14 +52,14 @@ body
   min-height: 100vh
 #main-container
   display: grid
-  grid-template-rows: auto 1fr auto
-  background-color: $lightgrey
+  grid-template-rows: auto auto 1fr auto
+  background-color: $bg-body
   min-width: 800px
   &.full-height
     grid-template-rows: 1fr
 
 button
-  background-color: $linkblue
+  background-color: $bg-primary
   border: none
   color: white
   border-radius: 0.25rem

@@ -41,6 +41,8 @@ import dataclasses
 import gzip
 import io
 import os
+import uuid
+import subprocess
 from typing import List, Optional, Tuple
 
 import flask
@@ -63,9 +65,11 @@ POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "ord")
 
 from .. import client
 
-def get_engine():
+def get_engine(database_name=None):
+    if database_name is None:
+        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
     connection_string = database.get_connection_string(
-        database=POSTGRES_DATABASE or client.POSTGRES_DB,
+        database=database_name,
         username=POSTGRES_USER or client.POSTGRES_USER,
         password=POSTGRES_PASSWORD or client.POSTGRES_PASSWORD,
         host=POSTGRES_HOST,
@@ -73,8 +77,8 @@ def get_engine():
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
     return engine
-def get_session():
-    engine = get_engine()
+def get_session(database_name=None):
+    engine = get_engine(database_name=database_name)
     database.prepare_database(engine)
     return orm.Session(engine)
 def get_isolated_connection():
@@ -86,18 +90,62 @@ def get_isolated_connection():
         password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT, options="-c search_path=public,ord"
     )
 
-
+DATA_DIR = "/home/cmccdb-data"
+BACKUP_DIR = DATA_DIR + "/uploads"
 
 @bp.route("/api/upload", methods=["POST"])
 def upload_dataset():
     """Writes the request body to the datasets table without validation."""
+
+    database_name = flask.request.args.get("database")
+    if database_name is None:
+        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+
     try:
+        file_name = flask.request.args.get("filename")
+        data = flask.request.get_data()
+
+        file_id = uuid.uuid4()
+        if file_name is None:
+            file_name = "Untitled.pbtxt"
+
+        file_name, ext = os.path.splitext(os.path.basename(file_name))[0]
+        file_name = f"{file_name}-{file_id}{ext}"
+
+        proper_file = os.path.join(BACKUP_DIR, file_name)
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        with open(proper_file, "w+") as dataset_file:
+            dataset_file.write(data)
+
+        cur_dir = os.getcwd()
+        os.chdir(BACKUP_DIR)
+        subprocess.call(
+            ["git", "commit", "-a", "-m", "'new data upload'"]
+        )
+        subprocess.call(
+            ["git", "push", "-a"]
+        )
+
+        if ext in {".xlsx", ".csv"}:
+            from ord_schema.scripts.construct_database import main
+
+            main({
+                "--data":proper_file,
+                "--name":flask.request.args.get("user", "Web Uploader"),
+                "--email":flask.request.args.get("email", "maboyer@tamu.edu")
+            })
+
+            proper_file = os.path.splitext(proper_file)[0] + ".pbtxt"
+
+            with open(proper_file) as dataset_file:
+                data = dataset_file.read()
+
         try:
-            dataset = dataset_pb2.Dataset.FromString(flask.request.get_data())
+            dataset = dataset_pb2.Dataset.FromString(data)
         except (google.protobuf.message.DecodeError, TypeError):
             dataset = dataset_pb2.Dataset()
             text_format.Parse(flask.request.get_data(as_text=True), dataset)
-        with get_session() as session:
+        with get_session(database_name) as session:
             database.add_dataset(dataset, session)
             session.flush()
             # database.update_rdkit_tables(dataset.dataset_id, session=session)
@@ -112,13 +160,17 @@ def upload_dataset():
 def reconfigure_database():
     """Writes the request body to the datasets table without validation."""
 
+    database_name = flask.request.args.get("database")
+    if database_name is None:
+        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+
     try:
         conn = get_isolated_connection()
         with conn.cursor() as cur:
             conn.autocommit = True
-            cur.execute("DROP DATABASE IF EXISTS ord;")
-            cur.execute("CREATE DATABASE ord;")
-        database.prepare_database(get_engine())
+            cur.execute(f"DROP DATABASE IF EXISTS {database_name};")
+            cur.execute(f"CREATE DATABASE {database_name};")
+        database.prepare_database(get_engine(database_name))
         return "ok"
     except Exception as error:  # pylint: disable=broad-except
         flask.abort(flask.make_response(str(error), 406))
@@ -133,7 +185,11 @@ def delete_dataset(dataset_id):
         #     dataset = dataset_pb2.Dataset()
         #     text_format.Parse(flask.request.get_data(as_text=True), dataset)
 
-        with get_session() as session:
+        database_name = flask.request.args.get("database")
+        if database_name is None:
+            database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+
+        with get_session(database_name) as session:
             database.delete_dataset(dataset_id, session)
             session.flush()
             # database.update_rdkit_tables(dataset.dataset_id, session=session)

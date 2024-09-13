@@ -374,7 +374,7 @@ ModalKetcher(
 @import '@/styles/transition'
 @import '@/styles/tabs'
 .search-options
-  max-height: 90vh
+  min-height: 90vh
   .options-title
     font-size: 1.5rem
     font-weight: 700
@@ -384,7 +384,7 @@ ModalKetcher(
     border-top-right-radius: 0.25rem
     margin-top: 1rem
     color: white
-    background-color: $linkblue
+    background-color: $bg-primary
     display: flex
     align-content: center
     justify-content: space-between

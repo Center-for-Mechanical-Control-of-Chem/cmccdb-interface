@@ -206,7 +206,7 @@ export default {
         column-gap: 2rem
         padding: 1rem
         margin: 0 5%
-        color: $linkblue
+        color: $bg-primary
         .select
           color: black
         .paginav
@@ -217,7 +217,7 @@ export default {
           cursor: pointer
           transition: .25s
           &:hover
-            color: $hoverblue
+            color: $bg-secondary
           &.prev, &.next
             grid-template-columns: auto 1fr
           &.first, &.last

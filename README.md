@@ -1,6 +1,81 @@
-# ord-interface
-Web interface and api for the Open Reaction Database
-## Structure
+# cmccdb-interface
+Web interface and api for the CMCC Reaction Database
+
+To spin up a new developer instance, we'll serve from `/home` by default and clone down the packages.
+You may need to clone them in `/tmp` and use `sudo` to move them to `/home`.
+We use a container workflow, so `podman` (or `docker`) is required.
+We will also need to use `podman compose`/`docker compose` so that needs to be installed as well.
+
+The basic installation looks like
+
+```commandline
+cd /home
+git clone git@github.com:Center-for-Mechanical-Control-of-Chem/cmccdb-schema.git
+git clone git@github.com:Center-for-Mechanical-Control-of-Chem/cmccdb-interface.git
+```
+
+and then to build the original ORD container that we patch into, we first create a conda environment 
+that will be used when building the necessary components
+
+```commandline
+conda create --name=ord python=3.10
+conda activate ord
+cd /home/cmccdb-interface
+pip install -e .
+```
+
+You may run into issues with `psycopg2`. In that case, install run `pip install psycopg2-binary`.
+
+Next we have to set up the base container that will hold the original interface implementation that we patch.
+
+```commandline
+cd ord_interface
+sudo podman build --file Dockerfile -t openreactiondatabase/ord-interface ..
+```
+
+We also need to configure the POSTGRES database which will run within the container. 
+To do that we take from `ord_interface/build_test_databse.sh` and set up the database to expose port `5432`
+
+```commandline
+export PGPASSWORD=postgres
+# Use a non-standard PGDATA so the database persists; see
+# https://nickjanetakis.com/blog/docker-tip-79-saving-a-postgres-database-in-a-docker-image.
+CONTAINER="$(sudo podman run --rm -d -p 5432:5432 -e POSTGRES_PASSWORD=${PGPASSWORD} -e PGDATA=/data mcs07/postgres-rdkit)"
+```
+
+However, we won't run the rest of that script, as we will use API endpoints to configure the database.
+So now we just save the container for later use
+
+```
+sudo podman commit "${CONTAINER}" "openreactiondatabase/ord-postgres:test"
+sudo podman stop "${CONTAINER}"
+```
+
+Now that we've configured the original interface, all of the patches we have constructed are applied by `docker-compose.yml`
+which will take local directories and inject them into the container at runtime.
+This gives us the flexibility to develop on the existing infrastructure.
+In the future, we will compile the entire flow into a new `Dockerfile` so that it can be served without patches.
+
+To start the app, we run
+
+```commandline
+cd /home/cmccdb-interface/ord_interface
+sudo podman compose up
+```
+
+Now, the database hasn't been configured, so we need to send a `POST` request to the `reconfigure` endpoint, i.e.
+we will run e.g.
+
+```commandline
+curl -X POST http://mechanochemistry-db-01.chem.tamu.edu/api/reconfigure
+```
+
+This endpoint will be changed upon public release to simply create the database.
+
+## Front-End
+
+This is how the app interface is structured
+
 - **/app** - Contains the Vue single page application
   - **/public** - Static SPA assets such as index.html
   - **/src** - Vue source code that gets compiled
@@ -13,69 +88,18 @@ Web interface and api for the Open Reaction Database
       - **/browse** - Main browse page of the different reaction sets
       - **/reaction-view** - Display of a single reaction from search results
       - **/search** - Search interface and results
-- **/ord_interface** - Contains the Flask app API and legacy interface
-  - **/client** - endpoints for the browse and search functionality
-  - **/editor** - endpoints for the reaction submission functionality
+
+To rebuild the front end, `npm` must be installed, and we run
+
+- **/ord_interface** - Contains the Flask app API
+  - **/client** - endpoints for the browse, search, and submissions functionality
   - **/visualization** - helper functions for reaction and molecule visuals
 
-## Key Caveats / Constraints
-- The Vue front end is dependant on the Flask API. Both must be running for the frontend to work.
-- The docker image of the test database must be running on port 5432
-- You will need to download the Ketcher interface and extract into appropriate folder (see instructions below) for parts of the interface to work
+## Adding End Points
 
-## How to Deploy
-...COMING SOON
+A specific `api/register/<name>` endpoint is configured that will look for a python script in `/tmp/name` to
 
-## Setup
-### 1. Download the repo
-```bash
-git clone git@github.com:open-reaction-database/ord-interface.git
-cd ord-interface
-```
-### 2. Set up the test database
-```bash
-# activate the virtual env of your choice, ex. venv, conda, etc.
-# install requirements and run setup script
-pip install -e .
-cd ./ord_interface
-./build_test_database.sh 
-```
-### 3. Set up and run the API via Docker
-Note: currently this also runs the old flask ui at port :5001
-```bash
-# from ./ord_interface
-docker build --file Dockerfile -t openreactiondatabase/ord-interface ..
-docker compose up
-```
-  - Leave Docker running in a terminal window.
-### 4. Set up and run the Vue SPA
-  - Download [Ketcher](https://github.com/epam/ketcher/releases/tag/v2.5.1) (Here's a direct link to the [.zip file](https://github.com/epam/ketcher/releases/download/v2.5.1/ketcher-standalone-2.5.1.zip)) and extract the files into `./app/src/ketcher`
-  - In a new terminal window:
-```bash
-cd ./app
-# install node packages
-npm i 
-# run vue spa locally
-npm run serve 
-```
-  - Open [localhost:8080](http://localhost:8080) to view the Vue ORD interface in your browser.
-  - The page will reload when you make changes.
-  - You may also see any lint errors in the console.
+## Modifying the schema
 
-### Run flask server in development mode
-  - This can be helpful for debugging the browse/search side of the application. Note that the flask dev mode will not work for the editor side of the application. For that to connect to the database, you need to run the full docker container documented above
-```bash
-cd ord_interface
-# Start the database backend.
-docker run -d -p 5432:5432 openreactiondatabase/ord-postgres:test
-# Start the development server.
-POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres FLASK_APP=interface.py FLASK_ENV=development python3 -m flask run
-```
-  - You can also use an ssh tunnel to the actual ORD database if you need a more complete dataset to test with. I run the tunnel on port 5433 to avoid conflict with other local postgres setup.
-```bash
-# In terminal 1:
-ssh -L 5433:backend.cluster-c5oagyqrwied.us-east-1.rds.amazonaws.com:5432 -i /path/to/ord_ssh_tunnel.pem ubuntu@44.206.43.237
-# In terminal 2 (password omitted):
-cd ord_interface
-POSTGRES_USER=ord_ro POSTGRES_PASSWORD=<ord_ro password> POSTGRES_PORT=5433 FLASK_APP=interface.py FLASK_ENV=development python3 -m flask run
-```
+When rebuilding the proto, new versions of `protobuf` insert information about the `runtime` that the container version
+doesn't have. This may need to be commented out.

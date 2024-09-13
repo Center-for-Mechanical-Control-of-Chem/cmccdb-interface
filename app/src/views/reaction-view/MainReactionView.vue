@@ -389,7 +389,7 @@ export default {
         color: black
         &.active
           color: white
-          background-color: $linkblue
+          background-color: $bg-primary
 .loading
   position: absolute
   width: 100%
@@ -430,7 +430,7 @@ export default {
       width: fit-content
   .full-record.button
     padding: 0.5rem 1rem
-    background-color: $linkblue
+    background-color: $bg-primary
     border-radius: 0.25rem
     width: fit-content
     color: white

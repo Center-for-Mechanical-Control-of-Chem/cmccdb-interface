@@ -46,8 +46,11 @@ export default {
       else if (!this.uploadFile.value)
         return alert("You must upload a file for the dataset before submitting.")
       // send dataset file to api for upload
+      this.urlQuery =  window.location.search
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/upload`);
+      xhr.open('POST', `/api/upload${this.urlQuery}`);
+      xhr.fileInfo = {filename: "" + this.uploadFile.name}
+      console.log("POST:", this.uploadFile.name, `/api/upload${this.urlQuery}`)
       const payload = this.uploadFile.value
       xhr.onload = () => {
         if (xhr.status === 200) {
@@ -74,13 +77,13 @@ export default {
       label(for='upload') Dataset filename:
       input#template(
         type='file'
-        accept='.pbtxt,.pb'
+        accept='.pbtxt,.pb,.xlsx,.csv'
         v-on:change='(e) => setFile(e)'
       )
   .submit
     button#upload-submit(@click='submitUpload') Submit Upload
   .copy Choose a &nbsp;
-                code() .pbtxt
+                code() .pbtxt/.xlsx/.csv
                 | &nbsp; file compiled with the &nbsp;
                 code() construct_dataset.py
                 | &nbsp; script in the &nbsp;
