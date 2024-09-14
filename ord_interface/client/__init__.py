@@ -18,7 +18,7 @@ import collections
 POSTGRES_PORT = 5432
 POSTGRES_USER = "postgres"
 POSTGRES_PASSWORD = "postgres"
-POSTGRES_DB = "ord"
+POSTGRES_DB = "cmcc"
 
 RDKIT_SCHEMA = "rdk"
 

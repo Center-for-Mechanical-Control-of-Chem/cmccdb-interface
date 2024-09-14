@@ -60,6 +60,10 @@ To start the app, we run
 
 ```commandline
 cd /home/cmccdb-interface/ord_interface
+# clean up the existing interface for saftey
+sudo podman container stop ord_interface_web_1
+sudo podman rm ord_interface_web_1
+# restart the container
 sudo podman compose up
 ```
 

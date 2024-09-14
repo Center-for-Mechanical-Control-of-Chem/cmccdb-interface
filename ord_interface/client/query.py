@@ -794,7 +794,7 @@ class OrdPostgres:
             port: Integer port.
         """
         self._connection = psycopg2.connect(
-            dbname=dbname, user=user, password=password, host=host, port=port, options="-c search_path=public,ord"
+            dbname=dbname, user=user, password=password, host=host, port=port, options="-c search_path=public,cmcc"
         )
         self._connection.set_session(readonly=True)
 
