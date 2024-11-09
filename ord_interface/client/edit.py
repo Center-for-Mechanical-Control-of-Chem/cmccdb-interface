@@ -201,7 +201,7 @@ def delete_dataset(dataset_id):
         flask.abort(flask.make_response(str(error), 406))
 
 ENDPOINT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "endpoints")
-@bp.route("/api/dev/<endpoint>/<name>")
+@bp.route("/api/dev/<endpoint>/<name>", methods=["GET", "POST"])
 def test_endpoint(endpoint, name):
     import importlib, os, sys
 

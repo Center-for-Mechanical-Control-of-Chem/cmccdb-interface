@@ -31,8 +31,8 @@ export default {
   },
   mounted() {
     this.urlQuery =  window.location.search
-    console.log("GET: ", `/api/fetch_datasets${this.urlQuery}`)
-    fetch(`/api/fetch_datasets${this.urlQuery}`, {method: "GET"})
+    console.log("GET: ", `/api/dev/browse/fetch_datasets${this.urlQuery}`)
+    fetch(`/api/dev/browse/fetch_datasets${this.urlQuery}`, {method: "GET"})
       .then(response => response.json())
       .then(data => {
         this.tableData = data

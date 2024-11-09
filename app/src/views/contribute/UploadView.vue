@@ -48,7 +48,7 @@ export default {
       // send dataset file to api for upload
       this.urlQuery =  window.location.search
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/upload${this.urlQuery}`);
+      xhr.open('POST', `/api/dev/contribute/upload${this.urlQuery}`);
       xhr.fileInfo = {filename: "" + this.uploadFile.name}
       console.log("POST:", this.uploadFile.name, `/api/upload${this.urlQuery}`)
       const payload = this.uploadFile.value
