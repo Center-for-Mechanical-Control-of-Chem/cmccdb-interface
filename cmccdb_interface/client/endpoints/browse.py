@@ -1,7 +1,7 @@
 
 
 import flask
-from ord_interface.client.search import connect
+from cmccdb_interface.client.search import connect
 
 def fetch_datasets():
     empty_datasets = [
