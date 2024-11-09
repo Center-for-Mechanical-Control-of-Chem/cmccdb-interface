@@ -61,7 +61,7 @@ POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
 POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "ord-postgres")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "ord-postgres")
-POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "ord")
+POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "cmcc")
 
 from .. import client
 
@@ -87,7 +87,7 @@ def get_isolated_connection():
     return psycopg2.connect(
         # dbname=POSTGRES_DATABASE,
         user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT, options="-c search_path=public,ord"
+        password=POSTGRES_PASSWORD, host=POSTGRES_HOST, port=POSTGRES_PORT, options="-c search_path=public,cmcc"
     )
 
 DATA_DIR = "/home/cmccdb-data"
@@ -197,5 +197,27 @@ def delete_dataset(dataset_id):
             # database.update_rdkit_ids(dataset.dataset_id, session=session)
             session.commit()
         return "ok"
+    except Exception as error:  # pylint: disable=broad-except
+        flask.abort(flask.make_response(str(error), 406))
+
+ENDPOINT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "endpoints")
+@bp.route("/api/dev/<endpoint>/<name>")
+def test_endpoint(endpoint, name):
+    import importlib, os, sys
+
+    if ENDPOINT_FOLDER not in sys.path:
+        sys.path.insert(0, ENDPOINT_FOLDER)
+    
+    try:
+        caller = None
+        if endpoint+".py" in os.listdir(ENDPOINT_FOLDER):
+            if endpoint in sys.modules:
+                mod = importlib.reload(sys.modules[endpoint])
+            else:
+                mod = importlib.import_module(endpoint)
+            caller = getattr(mod, name)
+        if caller is None:
+            raise ImportError(f"No endpoint module {endpoint}")
+        return caller()
     except Exception as error:  # pylint: disable=broad-except
         flask.abort(flask.make_response(str(error), 406))
