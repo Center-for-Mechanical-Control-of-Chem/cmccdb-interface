@@ -33,11 +33,11 @@ import docopt
 import sqlalchemy
 from sqlalchemy import orm
 
-from ord_schema import message_helpers
-from ord_schema.orm import database
-from ord_schema.proto import dataset_pb2
+from cmccdb_schema import message_helpers
+from cmccdb_schema.orm import database
+from cmccdb_schema.proto import dataset_pb2
 
-import ord_interface.client
+from cmccdb_interface.client import constants
 
 logger = logging.getLogger()
 
@@ -48,11 +48,11 @@ def main(kwargs):
     if not filenames:
         raise ValueError("--input did not match any files")
     connection_string = database.get_connection_string(
-        database=kwargs["--dbname"] or ord_interface.client.POSTGRES_DB,
-        username=kwargs["--user"] or ord_interface.client.POSTGRES_USER,
-        password=kwargs["--password"] or ord_interface.client.POSTGRES_PASSWORD,
+        database=kwargs["--dbname"] or constants.POSTGRES_DATABASE,
+        username=kwargs["--user"] or constants.POSTGRES_USER,
+        password=kwargs["--password"] or constants.POSTGRES_PASSWORD,
         host=kwargs["--host"],
-        port=kwargs["--port"] or ord_interface.client.POSTGRES_PORT,
+        port=kwargs["--port"] or constants.POSTGRES_PORT,
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
     with engine.begin() as connection:  # pytype: disable=attribute-error

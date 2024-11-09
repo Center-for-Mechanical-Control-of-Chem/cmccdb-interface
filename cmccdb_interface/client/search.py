@@ -46,17 +46,18 @@ from typing import List, Optional, Tuple
 import flask
 from rdkit import Chem
 
-from ord_schema.proto import dataset_pb2, reaction_pb2
+from cmccdb_schema.proto import dataset_pb2, reaction_pb2
+from cmccdb_schema.client import query
+from cmccdb_schema.visualization import generate_text, filters
 
-from ord_interface.client import query
-from ord_interface.visualization import generate_text, filters
+from . import constants
 
-bp = flask.Blueprint("client", __name__, url_prefix="/client", template_folder=".")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "ord-postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "ord-postgres")
-POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "cmcc")
+bp = flask.Blueprint("api", __name__, url_prefix="/api", template_folder=".")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", constants.POSTGRES_HOST)
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", constants.POSTGRES_PORT)
+POSTGRES_USER = os.getenv("POSTGRES_USER", constants.POSTGRES_USER)
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", constants.POSTGRES_PASSWORD)
+POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", constants.POSTGRES_DATABASE)
 
 BOND_LENGTH = 20
 MAX_RESULTS = 1000

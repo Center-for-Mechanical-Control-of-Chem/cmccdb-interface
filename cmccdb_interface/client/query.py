@@ -54,11 +54,28 @@ from psycopg2 import sql
 from rdkit import Chem
 from rdkit.Chem import rdChemReactions
 
-from ord_schema import message_helpers
-from ord_schema import validations
-from ord_schema.proto import reaction_pb2
+from cmccdb_schema import message_helpers
+from cmccdb_schema import validations
+from cmccdb_schema.proto import reaction_pb2
+
+from . import constants
 
 logger = logging.getLogger()
+
+class QueryContext:
+    target_database = constants.POSTGRES_DATABASE
+    def __init__(self, **opts):
+        self.opts = opts
+        self.old_context = {}
+    def __enter__(self):
+        cls = type(self)
+        for k,v in self.opts.items():
+            self.old_context[k] = getattr(cls, k)
+            setattr(cls, k, v)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        cls = type(self)
+        for k,v in self.old_context.items():
+            setattr(cls, k, v)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -159,7 +176,7 @@ class RandomSampleQuery(ReactionQueryBase):
         query = sql.SQL(
             """
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-            FROM ord.reaction TABLESAMPLE SYSTEM_ROWS (%s)
+            FROM cmcc.reaction TABLESAMPLE SYSTEM_ROWS (%s)
             JOIN dataset ON dataset.id = reaction.dataset_id
             """
         )
@@ -209,7 +226,7 @@ class DatasetIdQuery(ReactionQueryBase):
             sql.SQL(
                 """
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-            FROM ord.reaction
+            FROM cmcc.reaction
             JOIN dataset ON dataset.id = reaction.dataset_id
             WHERE dataset.dataset_id = ANY (%s)"""
             )
@@ -263,7 +280,7 @@ class ReactionIdQuery(ReactionQueryBase):
         query = sql.SQL(
             """
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-            FROM ord.reaction
+            FROM cmcc.reaction
             JOIN dataset ON dataset.id = reaction.dataset_id
             WHERE reaction.reaction_id = ANY (%s)
             """
@@ -362,9 +379,9 @@ class ReactionConversionQuery(ReactionQueryBase):
     def run(self, cursor: psycopg2.extensions.cursor, limit: Optional[int] = None) -> List[Result]:
         query = """
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-            FROM ord.reaction
+            FROM cmcc.reaction
             JOIN dataset ON dataset.id = reaction.dataset_id
-            JOIN ord.reaction_outcome on reaction_outcome.reaction_id = reaction.id
+            JOIN cmcc.reaction_outcome on reaction_outcome.reaction_id = reaction.id
             JOIN percentage on percentage.reaction_outcome_id = reaction_outcome.id
             WHERE percentage.value >= %s
               AND percentage.value <= %s
@@ -406,11 +423,11 @@ class ReactionYieldQuery(ReactionQueryBase):
     def run(self, cursor: psycopg2.extensions.cursor, limit: Optional[int] = None) -> List[Result]:
         query = """
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-            FROM ord.reaction
+            FROM cmcc.reaction
             JOIN dataset ON dataset.id = reaction.dataset_id
-            JOIN ord.reaction_outcome on reaction_outcome.reaction_id = reaction.id
-            JOIN ord.product_compound on product_compound.reaction_outcome_id = reaction_outcome.id
-            JOIN ord.product_measurement on product_measurement.product_compound_id = product_compound.id
+            JOIN cmcc.reaction_outcome on reaction_outcome.reaction_id = reaction.id
+            JOIN cmcc.product_compound on product_compound.reaction_outcome_id = reaction_outcome.id
+            JOIN cmcc.product_measurement on product_measurement.product_compound_id = product_compound.id
             JOIN percentage on percentage.product_measurement_id = product_measurement.id
             WHERE product_measurement.type = 'YIELD'
               AND percentage.value >= %s
@@ -471,7 +488,7 @@ class DoiQuery(ReactionQueryBase):
             sql.SQL(
                 """
                 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-                FROM ord.reaction
+                FROM cmcc.reaction
                 JOIN dataset ON dataset.id = reaction.dataset_id
                 JOIN reaction_provenance ON reaction_provenance.reaction_id = reaction.id
                 WHERE reaction_provenance.doi = ANY (%s)
@@ -540,10 +557,10 @@ class TreatmentQuery(ReactionQueryBase):
             sql.SQL(
                 """
                 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-                FROM ord.reaction
+                FROM cmcc.reaction
                 JOIN dataset ON dataset.id = reaction.dataset_id
-                JOIN ord.reaction_conditions on reaction_conditions.reaction_id = reaction.id
-                JOIN ord.mechanochemistry_conditions on mechanochemistry_conditions.reaction_conditions_id = reaction_conditions.id
+                JOIN cmcc.reaction_conditions on reaction_conditions.reaction_id = reaction.id
+                JOIN cmcc.mechanochemistry_conditions on mechanochemistry_conditions.reaction_conditions_id = reaction_conditions.id
                 WHERE CAST(mechanochemistry_conditions.type AS text) = ANY (%s)""" + (
                     """ 
                     AND mechanochemistry_conditions.liquid_assisted """
@@ -683,9 +700,9 @@ class ReactionComponentQuery(ReactionQueryBase):
             components.append(
                 f"""
                 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-                FROM ord.reaction
+                FROM cmcc.reaction
                 {mols_sql}
-                JOIN ord.dataset ON dataset.id = reaction.dataset_id
+                JOIN cmcc.dataset ON dataset.id = reaction.dataset_id
                 WHERE
                 {predicate_sql}
                 """

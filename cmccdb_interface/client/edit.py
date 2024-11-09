@@ -52,28 +52,28 @@ import sqlalchemy
 from sqlalchemy import orm
 
 import google.protobuf.message  # pytype: disable=import-error
-from ord_schema.orm import database
+from cmccdb_schema.orm import database
 from google.protobuf import text_format  # pytype: disable=import-error
-from ord_schema.proto import dataset_pb2, reaction_pb2
+from cmccdb_schema.proto import dataset_pb2, reaction_pb2
+
+from . import constants
 
 bp = flask.Blueprint("edit", __name__, url_prefix="/client", template_folder=".")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_USER = os.getenv("POSTGRES_USER", "ord-postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "ord-postgres")
-POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", "cmcc")
-
-from .. import client
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", constants.POSTGRES_HOST)
+POSTGRES_PORT = os.getenv("POSTGRES_PORT", constants.POSTGRES_PORT)
+POSTGRES_USER = os.getenv("POSTGRES_USER", constants.POSTGRES_USER)
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", constants.POSTGRES_PASSWORD)
+POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", constants.POSTGRES_DATABASE)
 
 def get_engine(database_name=None):
     if database_name is None:
-        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+        database_name = POSTGRES_DATABASE or constants.POSTGRES_DATABASE
     connection_string = database.get_connection_string(
         database=database_name,
-        username=POSTGRES_USER or client.POSTGRES_USER,
-        password=POSTGRES_PASSWORD or client.POSTGRES_PASSWORD,
+        username=POSTGRES_USER or constants.POSTGRES_USER,
+        password=POSTGRES_PASSWORD or constants.POSTGRES_PASSWORD,
         host=POSTGRES_HOST,
-        port=POSTGRES_PORT or client.POSTGRES_PORT,
+        port=POSTGRES_PORT or constants.POSTGRES_PORT,
     )
     engine = sqlalchemy.create_engine(connection_string, future=True)
     return engine
@@ -99,7 +99,7 @@ def upload_dataset():
 
     database_name = flask.request.args.get("database")
     if database_name is None:
-        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+        database_name = POSTGRES_DATABASE or constants.POSTGRES_DATABASE
 
     try:
         file_name = flask.request.args.get("filename")
@@ -162,7 +162,7 @@ def reconfigure_database():
 
     database_name = flask.request.args.get("database")
     if database_name is None:
-        database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+        database_name = POSTGRES_DATABASE or constants.POSTGRES_DATABASE
 
     try:
         conn = get_isolated_connection()
@@ -187,7 +187,7 @@ def delete_dataset(dataset_id):
 
         database_name = flask.request.args.get("database")
         if database_name is None:
-            database_name = POSTGRES_DATABASE or client.POSTGRES_DB
+            database_name = POSTGRES_DATABASE or constants.POSTGRES_DATABASE
 
         with get_session(database_name) as session:
             database.delete_dataset(dataset_id, session)

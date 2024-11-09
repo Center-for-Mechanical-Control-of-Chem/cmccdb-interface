@@ -15,11 +15,6 @@
 
 import collections
 
-POSTGRES_PORT = 5432
-POSTGRES_USER = "postgres"
-POSTGRES_PASSWORD = "postgres"
-POSTGRES_DB = "cmcc"
-
 RDKIT_SCHEMA = "rdk"
 
 # Postgres table schema.
