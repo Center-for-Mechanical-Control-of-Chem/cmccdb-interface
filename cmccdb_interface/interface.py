@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Entrypoint for the web interface."""
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__))) # allow ord_schema to be hot patched
+# import os, sys
+# sys.path.insert(0, os.path.dirname(os.path.dirname(__file__))) # allow ord_schema to be hot patched
 
 import flask
 
 # TODO(skearnes): Figure out how to use this.
 # import flask_talisman
 
-from ord_interface.client import search
-from ord_interface.client import edit
-from ord_interface.editor.py import serve
-from ord_interface.visualization import filters
+from cmccdb_interface.client import search
+from cmccdb_interface.client import edit
+from cmccdb_interface.visualization import filters
 
 # Set the ketcher distribution as the static folder.
 app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
@@ -34,7 +33,6 @@ app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
 app.jinja_env.filters.update(filters.TEMPLATE_FILTERS)  # pylint: disable=no-member
 app.register_blueprint(search.bp)
 app.register_blueprint(edit.bp)
-app.register_blueprint(serve.bp)
 
 
 @app.route("/ketcher")

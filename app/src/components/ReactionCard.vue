@@ -18,7 +18,7 @@
 import LoadingSpinner from '@/components/LoadingSpinner'
 import conditionUtil from '@/utils/conditions'
 import outcomesUtil from '@/utils/outcomes'
-import reaction_pb from 'ord-schema'
+import reaction_pb from 'cmccdb-schema'
 import CopyButton from '@/components/CopyButton'
 
 export default {
@@ -47,7 +47,7 @@ export default {
         })
     },
     getYield(measurements) {
-      const yieldObj = measurements.find(m => m.type == 3) // ord-schema type 3 == "YIELD"
+      const yieldObj = measurements.find(m => m.type == 3) // cmccdb-schema type 3 == "YIELD"
       if (yieldObj?.percentage) {
         return `${yieldObj.percentage.value}%`
       } else {

@@ -19,10 +19,10 @@ from typing import Optional
 
 import jinja2
 
-from ord_schema import message_helpers
-from ord_schema.proto import reaction_pb2
+from cmccdb_schema import message_helpers
+from cmccdb_schema.proto import reaction_pb2
 
-from ord_interface.visualization import filters
+from . import filters
 
 
 def _generate(reaction: reaction_pb2.Reaction, template_string: str, line_breaks: bool, **kwargs) -> str:

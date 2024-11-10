@@ -15,7 +15,7 @@
 -->
 
 <script>
-import reaction_pb from "ord-schema"
+import reaction_pb from "cmccdb-schema"
 import FloatingModal from "../../components/FloatingModal"
 import { amountObj, amountStr } from "../../utils/amount"
 

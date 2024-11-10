@@ -29,12 +29,12 @@ You may run into issues with `psycopg2`. In that case, install run `pip install 
 Next we have to set up the base container that will hold the original interface implementation that we patch.
 
 ```commandline
-cd ord_interface
-sudo podman build --file Dockerfile -t openreactiondatabase/ord-interface ..
+cd cmccdb_interface
+sudo podman build --file Dockerfile -t centerformechanochemistry/cmccdb-interface ../..
 ```
 
 We also need to configure the POSTGRES database which will run within the container. 
-To do that we take from `ord_interface/build_test_databse.sh` and set up the database to expose port `5432`
+To do that we take from `cmccdb_interface/build_test_databse.sh` and set up the database to expose port `5432`
 
 ```commandline
 export PGPASSWORD=postgres
@@ -47,7 +47,7 @@ However, we won't run the rest of that script, as we will use API endpoints to c
 So now we just save the container for later use
 
 ```
-sudo podman commit "${CONTAINER}" "openreactiondatabase/ord-postgres:test"
+sudo podman commit "${CONTAINER}" "centerformechanochemistry/cmccdb-postgres:test"
 sudo podman stop "${CONTAINER}"
 ```
 
@@ -59,10 +59,10 @@ In the future, we will compile the entire flow into a new `Dockerfile` so that i
 To start the app, we run
 
 ```commandline
-cd /home/cmccdb-interface/ord_interface
+cd /home/cmccdb-interface/cmccdb_interface
 # clean up the existing interface for saftey
-sudo podman container stop ord_interface_web_1
-sudo podman rm ord_interface_web_1
+sudo podman container stop cmccdb_interface_web_1
+sudo podman rm cmccdb_interface_web_1
 # restart the container
 sudo podman compose up
 ```
@@ -95,7 +95,7 @@ This is how the app interface is structured
 
 To rebuild the front end, `npm` must be installed, and we run
 
-- **/ord_interface** - Contains the Flask app API
+- **/cmccdb_interface** - Contains the Flask app API
   - **/client** - endpoints for the browse, search, and submissions functionality
   - **/visualization** - helper functions for reaction and molecule visuals
 

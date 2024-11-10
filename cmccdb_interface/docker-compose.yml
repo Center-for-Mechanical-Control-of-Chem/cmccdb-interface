@@ -15,7 +15,7 @@
 version: "3"
 services:
   database:
-    image: "openreactiondatabase/ord-postgres:test"
+    image: "centerformechanochemistry/cmccdb-postgres:test"
     command: [ "postgres", "-c", "log_statement=all" ]
     ports:
       - "5432:5432"
@@ -29,14 +29,12 @@ services:
       - POSTGRES_PASSWORD=postgres
       - GH_CLIENT_ID=${GH_CLIENT_ID}
       - GH_CLIENT_SECRET=${GH_CLIENT_SECRET}
-    image: "openreactiondatabase/ord-interface:latest"
+    image: "centerformechanochemistry/cmccdb-interface:latest"
     ports:
       - "80:80"
     volumes:
       - /home/cmccdb-data:/data-repository:z
-      - /home/cmccdb-schema/ord_schema:/app/ord-interface/ord_schema:z
-      - /home/cmccdb-interface/patch:/app/ord-interface/vue:z
-      - /home/cmccdb-interface/ord_interface/interface.py:/app/ord-interface/ord_interface/interface.py:z
-      - /home/cmccdb-interface/ord_interface/editor/html/datasets.html:/app/ord-interface/ord_interface/editor/html/datasets.html:z
-      - /home/cmccdb-interface/ord_interface/editor/py/serve.py:/app/ord-interface/ord_interface/editor/py/serve.py:z
-      - /home/cmccdb-interface/ord_interface/client/:/app/ord-interface/ord_interface/client/
+      - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
+      - /home/cmccdb-interface/patch:/app/cmccdb-schema/vue:z
+      - /home/cmccdb-interface/cmccdb_interface/interface.py:/app/cmccdb-interface/cmccdb_interface/interface.py:z
+      - /home/cmccdb-interface/cmccdb_interface/client/:/app/cmccdb-interface/cmccdb_interface/client/

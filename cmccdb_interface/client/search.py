@@ -47,8 +47,9 @@ import flask
 from rdkit import Chem
 
 from cmccdb_schema.proto import dataset_pb2, reaction_pb2
-from cmccdb_schema.client import query
-from cmccdb_schema.visualization import generate_text, filters
+
+from . import query
+from ..visualization import generate_text, filters
 
 from . import constants
 
@@ -299,10 +300,10 @@ def download_results():
         results = connect(database_name).run_query(command)
     except query.QueryException as error:
         return flask.abort(flask.make_response(str(error), 400))
-    dataset = dataset_pb2.Dataset(name="ORD Search Results", reactions=[result.reaction for result in results])
+    dataset = dataset_pb2.Dataset(name="CMCCDB Search Results", reactions=[result.reaction for result in results])
     return flask.send_file(
         io.BytesIO(gzip.compress(dataset.SerializeToString())),
         as_attachment=True,
-        download_name="ord_search_results.pb.gz",
+        download_name="cmccdb_search_results.pb.gz",
     )
 

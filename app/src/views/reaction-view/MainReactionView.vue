@@ -15,7 +15,7 @@
 -->
 
 <script>
-import reaction_pb from "ord-schema"
+import reaction_pb from "cmccdb-schema"
 import CompoundView from "./CompoundView"
 import SetupView from "./SetupView"
 import ConditionsView from "./ConditionsView"

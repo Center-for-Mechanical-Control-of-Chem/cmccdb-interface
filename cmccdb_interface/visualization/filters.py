@@ -24,11 +24,11 @@ from typing import Any, Iterable, List, Mapping, Optional, Tuple
 from dateutil import parser
 from google.protobuf import text_format  # pytype: disable=import-error
 
-from ord_schema import units
-from ord_schema import message_helpers
-from ord_schema.proto import reaction_pb2
+from cmccdb_schema import units
+from cmccdb_schema import message_helpers
+from cmccdb_schema.proto import reaction_pb2
 
-from ord_interface.visualization import drawing
+from . import drawing
 
 
 def _is_true(boolean: Any) -> bool:

@@ -35,32 +35,28 @@ RUN apt-get update \
 
 # Fetch and build editor dependencies.
 # NOTE(kearnes): Do this before COPYing the local state so it can be cached.
-WORKDIR /app/ord-interface/ord_interface
+WORKDIR /app/cmccdb-interface/cmccdb_interface
 RUN wget https://github.com/epam/ketcher/releases/download/v2.5.1/ketcher-standalone-2.5.1.zip \
    && unzip ketcher-standalone-2.5.1.zip
-WORKDIR /app/ord-interface/ord_interface/editor
-RUN wget https://github.com/google/closure-library/archive/v20200517.tar.gz \
-   && tar -xzf v20200517.tar.gz \
-   && rm v20200517.tar.gz
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-js-3.14.0.tar.gz \
-   && tar -xzf protobuf-js-3.14.0.tar.gz \
-   && rm protobuf-js-3.14.0.tar.gz
-RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip \
-   && unzip protoc-3.14.0-linux-x86_64.zip
-ENV PATH="/app/ord-interface/ord_interface/editor/bin:${PATH}"
-RUN wget https://raw.githubusercontent.com/google/closure-compiler/master/contrib/externs/jquery-3.3.js \
-   && mkdir -p externs \
-   && mv jquery-3.3.js externs
-RUN npm install google-closure-compiler@20220803
+# WORKDIR /app/ord-interface/ord_interface/editor
+# RUN wget https://github.com/google/closure-library/archive/v20200517.tar.gz \
+#    && tar -xzf v20200517.tar.gz \
+#    && rm v20200517.tar.gz
+# RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-js-3.14.0.tar.gz \
+#    && tar -xzf protobuf-js-3.14.0.tar.gz \
+#    && rm protobuf-js-3.14.0.tar.gz
+# RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip \
+#    && unzip protoc-3.14.0-linux-x86_64.zip
+# ENV PATH="/app/ord-interface/ord_interface/editor/bin:${PATH}"
+# RUN wget https://raw.githubusercontent.com/google/closure-compiler/master/contrib/externs/jquery-3.3.js \
+#    && mkdir -p externs \
+#    && mv jquery-3.3.js externs
+# RUN npm install google-closure-compiler@20220803
 WORKDIR /app
-RUN wget https://github.com/open-reaction-database/ord-schema/archive/refs/tags/v0.3.71.zip \
-   && unzip v0.3.71.zip \
-   && rm v0.3.71.zip \
-   && mv ord-schema-0.3.71 ord-schema
 
 # Install dependencies.
-WORKDIR /app/ord-interface
-COPY setup.py README.md ./
+WORKDIR /app/cmccdb-interface
+COPY cmccdb-interface/setup.py cmccdb-interface/README.md ./
 RUN pip install --upgrade pip \
    && pip install gunicorn wheel
 # https://stackoverflow.com/a/60511098.
@@ -69,32 +65,32 @@ RUN python setup.py egg_info \
    && rm -rf *.egg-info/
 
 # Copy the local state.
-COPY ord_interface/editor/js/ ord_interface/editor/js/
-COPY ord_interface/editor/build.sh ord_interface/editor
-WORKDIR /app/ord-interface/ord_interface/editor
-RUN ./build.sh
-WORKDIR /app/ord-interface
+# COPY ord_interface/editor/js/ ord_interface/editor/js/
+# COPY ord_interface/editor/build.sh ord_interface/editor
+# WORKDIR /app/ord-interface/ord_interface/editor
+# RUN ./build.sh
+WORKDIR /app
+COPY cmccdb-schema cmccdb-schema
+WORKDIR /app/cmccdb-interface
 # Build the Vue app.
-COPY app/ app/
-WORKDIR /app/ord-interface/app
-RUN cp -r /app/ord-interface/ord_interface/standalone/ /app/ord-interface/app/src/ketcher \
+COPY cmccdb-interface/app/ app/
+WORKDIR /app/cmccdb-interface/app
+RUN cp -r /app/cmccdb-interface/cmccdb_interface/standalone/ /app/cmccdb-interface/app/src/ketcher \
    && npm install \
    && npm run build \
-   && mv dist/ /app/ord-interface/vue
-WORKDIR /app/ord-interface
-# Copy the rest of the editor files.
-COPY ord_interface/editor/ ord_interface/editor/
-# Now copy everything else.
-COPY ord_interface/about.html ord_interface/
-COPY ord_interface/interface.py ord_interface/
-COPY ord_interface/client/ ord_interface/client/
-COPY ord_interface/visualization/ ord_interface/visualization/
+   && mv dist/ /app/cmccdb-interface/vue
+WORKDIR /app/cmccdb-interface
+COPY cmccdb-interface/cmccdb_interface/about.html cmccdb_interface/
+COPY cmccdb-interface/cmccdb_interface/interface.py cmccdb_interface/
+COPY cmccdb-interface/cmccdb_interface/client/ cmccdb_interface/client/
+COPY cmccdb-interface/cmccdb_interface/visualization/ cmccdb_interface/visualization/
 RUN pip install .
 
 # Build and launch the interface.
-COPY ord_interface/start_app.sh .
-COPY ord_interface/nginx.conf /etc/nginx/nginx.conf
+COPY cmccdb-interface/cmccdb_interface/start_app.sh .
+COPY cmccdb-interface/cmccdb_interface/nginx.conf /etc/nginx/nginx.conf
 
+ENV PYTHONPATH=/app/cmccdb-interface:/app/cmccdb-schema
 RUN ln -sf /dev/stderr /var/log/nginx.log \
    && chmod +x start_app.sh
-ENTRYPOINT ["/app/ord-interface/start_app.sh"]
+ENTRYPOINT ["/app/cmccdb-interface/start_app.sh"]

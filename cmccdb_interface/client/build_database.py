@@ -37,7 +37,7 @@ from cmccdb_schema import message_helpers
 from cmccdb_schema.orm import database
 from cmccdb_schema.proto import dataset_pb2
 
-from cmccdb_interface.client import constants
+from . import constants
 
 logger = logging.getLogger()
 

@@ -16,7 +16,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner'
-import reaction_pb from "ord-schema"
+import reaction_pb from "cmccdb-schema"
 import hexToUint from "@/utils/hexToUint"
 import ReactionCard from '@/components/ReactionCard'
 import DownloadResults from '@/components/DownloadResults'

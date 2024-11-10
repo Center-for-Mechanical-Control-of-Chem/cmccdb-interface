@@ -21,11 +21,11 @@ with open("README.md") as f:
 
 if __name__ == "__main__":
     setuptools.setup(
-        name="ord-interface",
-        description="Interface for the Open Reaction Database",
+        name="cmccdb-interface",
+        description="Interface for the Center for Mechanochemistry Reaction Database",
         long_description=long_description,
         long_description_content_type="text/markdown",
-        url="https://github.com/Open-Reaction-Database/ord-interface",
+        url="https://github.com/Center-for-Mechanical-Control-of-Chem/cmccdb-interface",
         classifiers=[
             "Programming Language :: Python :: 3",
             "License :: OSI Approved :: Apache Software License",
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         ],
         packages=setuptools.find_packages(),
         package_data={
-            "ord_interface.visualization": [
+            "cmccdb_interface.visualization": [
                 "template.html",
                 "template.txt",
             ],
@@ -44,20 +44,29 @@ if __name__ == "__main__":
             "flask>=1.1.2",
             "flask-talisman>=1.0.0",
             "jinja2>=2.0.0",
-            "ord-schema==0.3.71",
+            # "ord-schema==0.3.71",
             "pandas>=1.0.4",
             "protobuf==4.22.3",
             "rdkit>=2021.9.5",
             "psycopg2>=2.8.5",
             "pygithub>=1.51",
             "requests>=2.24.0",
-        ],
-        extras_require={
-            "tests": [
-                "black>=22.3.0",
-                "pylint>=2.13.9",
-                "pytest>=6.2.5",
-                "pytype>=2022.5.19",
-            ],
-        },
+            "inflection>=0.5.1",
+            "joblib>=1.0.0",
+            "numpy<2",
+            "openpyxl>=3.0.5",
+            "psycopg2-binary>=2.8.5",
+            "pygithub>=1.51",
+            "python-dateutil>=1.10.0",
+            "rdkit>=2021.9.5",
+            "sqlalchemy>=1.4.39"
+        ]
+        # extras_require={
+        #     "tests": [
+        #         "black>=22.3.0",
+        #         "pylint>=2.13.9",
+        #         "pytest>=6.2.5",
+        #         "pytype>=2022.5.19",
+        #     ],
+        # },
     )
