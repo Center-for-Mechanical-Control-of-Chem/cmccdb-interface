@@ -1,86 +1,46 @@
-# import flask
-# import os
-# from flask import request, redirect, url_for
 
 
-# app = flask.Flask(__name__)
+import flask
+import os
+import sys
+import importlib
+from cmccdb_interface.client import handlers
+from cmccdb_interface.database import manage, datasets
 
-# UPLOAD_FOLDER = ('/home/coder/cmccdb-interface/ord_interface/client/endpoints/UPLOAD_FOLDER')
-# ALLOWED_EXTENSIONS = {'xlsx', 'csv'}
-
-# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-# def allowed_file(filename):
-   
-#     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# @app.route('/api/contribute', methods=['POST'])
-# def contribute():
-     
-#     if 'file' not in request.files:
-#         return 'No file part', 400
-
-#     file = request.files['file']
-    
-   
-#     if file.filename == '':
-#         return 'No selected file', 400
-
-   
-#     if not is_valid_filename(file.filename):
-#         return 'Invalid filename', 400
-
-    
-#     if file and allowed_file(file.filename):
-        
-#         filename = file.filename
-
-        
-#         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-#         file.save(file_path)
-
-#         try:
-            
-#             user = request.form.get('--name', 'Web_uploader')
-#             email = request.form.get('--email', 'maboyer@tamu.edu')
-
-            
-           
-
-#         except Exception as e:
-#             return str(e), 500
-
-    
-#         return redirect('/browse')
-
-#     return 'File type not allowed', 400
-
-# @app.route('/contribute', methods=['POST'])
+# WEB_UPLOADER_NAME = "Web Uploader"
+# WEB_UPLOADER_EMAIL = "maboyer@tamu.edu"
 # def upload():
-#     if 'file' not in request.files:
-#         return redirect(request.url)
-#     file = request.files['file']
-#     if file and allowed_file(file.filename):
-#         filename = secure_filename(file.filename)
-#         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-#         file.save(file_path)
+#     import cmccdb_interface.database.datasets
+#     datasets = importlib.reload(cmccdb_interface.database.datasets)
+#     import cmccdb_schema.scripts.construct_dataset
+#     importlib.reload(cmccdb_schema.scripts.construct_dataset)
 
-        
-#         pptx_filename = filename.rsplit('.', 1)[0] + '.pptx'
-#         pptx_path = os.path.join(app.config['UPLOAD_FOLDER'], pptx_filename)
-#         convert_xlsx_to_pptx(file_path, pptx_path)
+#     database_name = flask.request.args.get("database")
+#     default_uploader = os.environ.get("CMCCDB_UPLOADER_NAME", WEB_UPLOADER_NAME)
+#     default_email = os.environ.get("CMCCDB_UPLOADER_EMAIL", WEB_UPLOADER_EMAIL)
 
-        
-#         return redirect(url_for('download_file', filename=pptx_filename))
-#     else:
-#         return "File type not allowed", 400
+#     try:
+#         file_name = flask.request.files['uploadFile'].filename
+#         body = flask.request.files['uploadFile'].read()
 
-# @app.route('/contribute/<filename>')
-# def download_file(filename):
-#     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+#         dataset = datasets.prep_and_create_pb_dataset(
+#             file_name,
+#             body,
+#             uploader_name=flask.request.args.get("user", default_uploader),
+#             uploader_email=flask.request.args.get("email", default_email)
+#             )
+#         manage.add_dataset(dataset, database_name=database_name)
+#         # backups.commit_backup()
+#         return flask.jsonify({"redirect_url":"browse"})
+#     except Exception as error:  # pylint: disable=broad-except
+#         return flask.abort(handlers.make_error_response(error, 406))
 
-# if __name__ == "__main__":
-    
-#     if not os.path.exists(UPLOAD_FOLDER):
-#         os.makedirs(UPLOAD_FOLDER)
-#     app.run(debug=True)
+# def delete_dataset():
+#     """Writes the request body to the datasets table without validation."""
+#     try:
+#         database_name = flask.request.args.get("database")
+#         dataset_id = flask.request.args.get("dataset_id")
+#         manage.delete_dataset(dataset_id, database_name=database_name)
+#         return handlers.make_string_response("ok")
+#     except Exception as error:  # pylint: disable=broad-except
+#         flask.abort(handlers.make_error_response(error, 406))

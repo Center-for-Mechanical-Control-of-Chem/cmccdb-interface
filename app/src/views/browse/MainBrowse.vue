@@ -26,24 +26,33 @@ export default {
   data() {
     return {
       loading: true,
-      tableData: []
+      tableData: [],
+      body: "No datasets found"
     }
   },
   mounted() {
     this.urlQuery =  window.location.search
-    console.log("GET: ", `/api/dev/browse/fetch_datasets${this.urlQuery}`)
-    fetch(`/api/dev/browse/fetch_datasets${this.urlQuery}`, {method: "GET"})
+    console.log("GET: ", `/api/fetch_datasets${this.urlQuery}`)
+    fetch(`/api/fetch_datasets${this.urlQuery}`, {method: "GET"})
       .then(response => response.json())
-      .then(data => {
-        this.tableData = data
-        this.loading = false
+      .then(
+        data => {
+          if ("traceback" in data) {
+            alert(data["traceback"])
+          } else if ("response" in data) {
+            this.body = data["response"]
+            this.loading = false
+          } else {
+            this.tableData = data
+            this.loading = false
+          }
       })
   }
 }
 </script>
 
 <template lang="pug">
-#browse-main
+#browse-main 
   EntityTable(
     :tableData='tableData'
     title="",
@@ -63,8 +72,19 @@ export default {
         .column {{row.Name}}
         .column {{row.Description?.length > 75 ? row.Description.substr(0,75)+"..." : row.Description}}
         .column {{row.Size}}
-  .loading(v-else)
+  .loading(
+    :loading='loading',
+    v-else-if='loading'
+    )
     LoadingSpinner
+  .container(
+      :body='body',
+      v-else
+  ) 
+    p(
+      style="text-align: center"
+    ) {{body}}
+  
 </template>
 
 <style lang="sass" scoped>

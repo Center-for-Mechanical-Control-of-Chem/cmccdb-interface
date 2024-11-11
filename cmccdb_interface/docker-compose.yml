@@ -15,10 +15,15 @@
 version: "3"
 services:
   database:
-    image: "centerformechanochemistry/cmccdb-postgres:test"
+    image: "mcs07/postgres-rdkit:latest"
     command: [ "postgres", "-c", "log_statement=all" ]
     ports:
       - "5432:5432"
+    environment:
+      - PGDATA=/data
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - /home/cmcc-database:/data:z
   web:
     depends_on:
       - database
@@ -33,8 +38,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - /home/cmccdb-data:/data-repository:z
+      - /home/cmccdb-data:/app/cmccdb-data:z
       - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
       - /home/cmccdb-interface/patch:/app/cmccdb-schema/vue:z
-      - /home/cmccdb-interface/cmccdb_interface/interface.py:/app/cmccdb-interface/cmccdb_interface/interface.py:z
-      - /home/cmccdb-interface/cmccdb_interface/client/:/app/cmccdb-interface/cmccdb_interface/client/
+      - /home/cmccdb-interface/cmccdb_interface:/app/cmccdb-interface/cmccdb_interface:z

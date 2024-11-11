@@ -46,47 +46,16 @@ from typing import List, Optional, Tuple
 import flask
 from rdkit import Chem
 
-from cmccdb_schema.proto import dataset_pb2, reaction_pb2
+from cmccdb_schema.proto import reaction_pb2
 
-from . import query
 from ..visualization import generate_text, filters
+from ..database import query
+from . import handlers
 
-from . import constants
-
-bp = flask.Blueprint("api", __name__, url_prefix="/api", template_folder=".")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", constants.POSTGRES_HOST)
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", constants.POSTGRES_PORT)
-POSTGRES_USER = os.getenv("POSTGRES_USER", constants.POSTGRES_USER)
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", constants.POSTGRES_PASSWORD)
-POSTGRES_DATABASE = os.getenv("POSTGRES_DATABASE", constants.POSTGRES_DATABASE)
+bp = flask.Blueprint("api", __name__, url_prefix="/client", template_folder=".")
 
 BOND_LENGTH = 20
 MAX_RESULTS = 1000
-
-
-def _run_query(database_name: str | None, commands: list[query.ReactionQueryBase], limit: int | None) -> list[query.Result]:
-
-    """Runs a query and returns the matched reactions."""
-    if len(commands) == 0:
-        results = []
-    elif len(commands) == 1:
-        results = connect(database_name).run_query(commands[0], limit=limit)
-    else:
-        # Perform each query without limits and take the intersection of matched reactions.
-        connection = connect(database_name)
-        reactions = {}
-        intersection = None
-        for command in commands:
-            this_results = {result.reaction_id: result for result in connection.run_query(command)}
-            reactions |= this_results
-            if intersection is None:
-                intersection = set(this_results.keys())
-            else:
-                intersection &= this_results.keys()
-        results = [reactions[reaction_id] for reaction_id in intersection]
-        if limit:
-            results = results[:limit]
-    return results
 
 
 @bp.route("/id/<reaction_id>")
@@ -94,7 +63,7 @@ def show_id(reaction_id):
     """Returns the pbtxt of a single reaction as plain text."""
     database_name = flask.request.args.get("database")
 
-    results = connect(database_name).run_query(query.ReactionIdQuery([reaction_id]))
+    results = query.QueryHandler(database_name).run_query(query.ReactionIdQuery([reaction_id]))
     if len(results) == 0:
         return flask.abort(404)
     reaction = results[0].reaction
@@ -114,7 +83,7 @@ def render_reaction(reaction_id):
     database_name = flask.request.args.get("database")
 
     command = query.ReactionIdQuery([reaction_id])
-    results = connect(database_name).run_query(command)
+    results = query.QueryHandler(database_name).run_query(command)
     compact = flask.request.args.get("compact") != "false"  # defaults to true
     print("compact", compact)
     if len(results) == 0 or len(results) > 1:
@@ -140,28 +109,6 @@ def render_compound():
         return flask.jsonify("[Compound cannot be displayed]")
 
 
-def connect(database_name):
-    if database_name is None:
-        database_name = POSTGRES_DATABASE
-    return query.OrdPostgres(
-        dbname=database_name,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD,
-        host=POSTGRES_HOST,
-        port=int(POSTGRES_PORT),
-    )
-
-
-def prep_results_for_json(results: list[query.Result]) -> list[dict]:
-    """Reads results from a query and preps for JSON encoding."""
-    response = []
-    for result in results:
-        result = dataclasses.asdict(result)
-        result["proto"] = result["proto"].hex()  # Convert to hex for JSON.
-        response.append(result)
-    return response
-
-
 @bp.route("/api/fetch_reactions", methods=["POST"])
 def fetch_reactions():
     """Fetches a list of Reactions by ID."""
@@ -171,10 +118,10 @@ def fetch_reactions():
     reaction_ids = flask.request.get_json()
     command = query.ReactionIdQuery(reaction_ids)
     try:
-        results = connect(database_name).run_query(command)
+        results = query.QueryHandler(database_name).run_query(command, query_props=True)
         return flask.jsonify(prep_results_for_json(results))
     except query.QueryException as error:
-        return flask.abort(flask.make_response(str(error), 400))
+        return flask.abort(handlers.make_error_response(error, 400))
 
 
 @bp.route("/api/fetch_datasets", methods=["GET"])
@@ -182,22 +129,21 @@ def fetch_datasets():
     """Fetches info about the current datasets."""
     database_name = flask.request.args.get("database")
 
-    engine = connect(database_name)
-    rows = {}
-    with engine.connection, engine.cursor() as cursor:
-        cursor.execute("SELECT id, dataset_id, name, description FROM dataset")
-        for row_id, dataset_id, name, description in cursor:
-            rows[row_id] = {
-                "Dataset ID": dataset_id,
-                "Name": name,
-                "Description": description,
-                "Size": 0,
-            }
-        # Get dataset sizes.
-        cursor.execute("SELECT dataset_id, COUNT(reaction_id) FROM reaction GROUP BY dataset_id")
-        for row_id, count in cursor:
-            rows[row_id]["Size"] = count
-        return list(rows.values())
+    rows = [
+        {
+            "Dataset ID": row["dataset_id"],
+            "Name": row["name"],
+            "Description": row["description"],
+            "Size": row["size"]
+        }
+        for row in query.fetch_datasets(database_name=database_name, get_sizes=True, undefined_means_empty=True)
+    ]
+    if len(rows) == 0:
+        return {
+            "response":f"No datasets found for database {database_name}"
+        }
+    else:
+        return rows
 
 
 @bp.route("/api/query")
@@ -210,12 +156,12 @@ def run_query():
     database_name = flask.request.args.get("database")
 
     commands, limit = build_query()
-    if len(commands) == 0:
-        return flask.abort(flask.make_response("no query defined", 400))
     try:
-        return flask.jsonify(prep_results_for_json(_run_query(database_name, commands, limit)))
-    except query.QueryException as error:
-        return flask.abort(flask.make_response(str(error), 400))
+        if len(commands) == 0:
+            raise ValueError("no query defined")
+        return flask.jsonify(query.run_query(commands, limit=limit, database_name=database_name, prep_json=True))
+    except Exception as error:
+        return flask.abort(handlers.make_error_response(error, 400))
 
 
 def build_query() -> Tuple[List[query.ReactionQueryBase], Optional[int]]:
@@ -283,27 +229,26 @@ def get_molfile():
     try:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
-            raise ValueError(smiles)
+            raise ValueError(f"could not parse SMILES: {smiles}")
         return flask.jsonify(Chem.MolToMolBlock(mol))
-    except ValueError:
-        return f"could not parse SMILES: {smiles}", 400
+    except Exception as error:
+        return flask.abort(handlers.make_error_response(error, 400))
 
-
+SEARCH_RESULTS_FILE_NAME = "cmccdb_search_results"
 @bp.route("/api/download_results", methods=["POST"])
 def download_results():
     """Downloads search results as a Dataset proto."""
     database_name = flask.request.args.get("database")
+    file_name = flask.request.args.get("filename", SEARCH_RESULTS_FILE_NAME)
 
     reaction_ids = [row["Reaction ID"] for row in flask.request.get_json()]
     command = query.ReactionIdQuery(reaction_ids[:MAX_RESULTS])
     try:
-        results = connect(database_name).run_query(command)
+        results = query.QueryHandler(database_name).run_query(command)
     except query.QueryException as error:
-        return flask.abort(flask.make_response(str(error), 400))
-    dataset = dataset_pb2.Dataset(name="CMCCDB Search Results", reactions=[result.reaction for result in results])
+        return flask.abort(handlers.make_error_response(error, 400))
     return flask.send_file(
-        io.BytesIO(gzip.compress(dataset.SerializeToString())),
+        query.serialize_query_results(file_name, results),
         as_attachment=True,
-        download_name="cmccdb_search_results.pb.gz",
+        download_name=file_name+".pb.gz",
     )
-

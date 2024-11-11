@@ -28,6 +28,7 @@ RUN apt-get update \
    default-jre \
    nginx \
    npm \
+   git \
    procps \
    unzip \
    && apt-get clean \

@@ -23,6 +23,7 @@ export default {
         name: null,
         loading: false,
         value: null,
+        file: null
       }
     }
   },
@@ -33,30 +34,33 @@ export default {
       if (!files.length) return console.error('No file')
       this.uploadFile.loading = true
       this.uploadFile.name = files[0].name
-      const fileReader = new FileReader()
-      fileReader.onload = readerEvent => {
-        this.uploadFile.value = readerEvent.target.result
-        this.uploadFile.loading = false
-      }
-      fileReader.readAsArrayBuffer(files[0])
+      this.uploadFile.file = files[0]
+      this.uploadFile.loading = false
+      // const fileReader = new FileReader()
+      // fileReader.onload = readerEvent => {
+      //   this.uploadFile.value = readerEvent.target.result
+      //   this.uploadFile.loading = false
+      // }
+      // fileReader.readAsArrayBuffer(files[0])
     },
     submitUpload() {
       if (this.uploadFile.loading)
         return alert("Files are still processing. Please try again in a moment.")
-      else if (!this.uploadFile.value)
+      else if (!this.uploadFile.file)
         return alert("You must upload a file for the dataset before submitting.")
       // send dataset file to api for upload
       this.urlQuery =  window.location.search
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/dev/contribute/upload${this.urlQuery}`);
-      xhr.fileInfo = {filename: "" + this.uploadFile.name}
+      xhr.open('POST', `/api/upload${this.urlQuery}`);
       console.log("POST:", this.uploadFile.name, `/api/upload${this.urlQuery}`)
-      const payload = this.uploadFile.value
+      let payload = new FormData();
+      payload.append('uploadFile', this.uploadFile.file);
       xhr.onload = () => {
+        let response = JSON.parse(xhr.response);
         if (xhr.status === 200) {
           location.reload();
         } else {
-          alert('Error: ' + xhr.response);
+          alert(response["traceback"])
         }
       }
       // Attempt to catch timeouts.
