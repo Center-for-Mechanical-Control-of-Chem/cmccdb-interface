@@ -24,7 +24,8 @@ export default {
         loading: false,
         value: null,
         file: null
-      }
+      },
+      traceback: null
     }
   },
   methods: {
@@ -60,7 +61,8 @@ export default {
         if (xhr.status === 200) {
           location.reload();
         } else {
-          alert(response["traceback"])
+          this.traceback = "ERROR: \n" + response["traceback"]
+          alert("An error occured: see the traceback")
         }
       }
       // Attempt to catch timeouts.
@@ -92,6 +94,10 @@ export default {
                 code() construct_dataset.py
                 | &nbsp; script in the &nbsp;
                 a(href="https://github.com/Center-for-Mechanical-Control-of-Chem/cmccdb-schema") cmccdb-schema repository
+  .error-message 
+    code 
+      pre {{ traceback }}
+   
 </template>
 
 <style lang="sass" scoped>
@@ -111,4 +117,6 @@ export default {
     margin-bottom: 2rem
   .copy
     margin-top: 1rem
+  .error-message
+    max-width: 850px
 </style>

@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-DATA_DIR = "/home/cmccdb-data"
+DATA_DIR = "/app/cmccdb-data"
 BACKUP_DIR = DATA_DIR + "/uploads"
 def commit_backup():
     cur_dir = os.getcwd()

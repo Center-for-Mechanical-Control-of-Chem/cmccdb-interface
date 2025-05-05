@@ -16,6 +16,8 @@
 # sys.path.insert(0, os.path.dirname(os.path.dirname(__file__))) # allow ord_schema to be hot patched
 
 import flask
+import os
+import json
 
 # TODO(skearnes): Figure out how to use this.
 # import flask_talisman
@@ -33,6 +35,15 @@ app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
 app.jinja_env.filters.update(filters.TEMPLATE_FILTERS)  # pylint: disable=no-member
 app.register_blueprint(search.bp)
 app.register_blueprint(edit.bp)
+
+session_key = os.environ.get("CMCCDB_SESSION_KEY")
+session_key_file = "/app/cmccdb_session_key.json"
+if session_key is None:
+    if os.path.exists(session_key_file):
+        with open(session_key_file) as credentials:
+            creds = json.load(credentials)
+        session_key = creds.get("session_key")
+app.secret_key = session_key
 
 
 @app.route("/ketcher")

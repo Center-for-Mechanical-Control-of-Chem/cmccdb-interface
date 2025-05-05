@@ -54,6 +54,11 @@ const routes =
         name : 'ketcher',
         component : () => import('../views/viewKetcher/MainKetcher.vue')
       },
+      {
+        path : '/auth/device',
+        name : 'auth-device',
+        component : () => import('../views/auth/DeviceAuth.vue')
+      }
     ]
 
     const router =

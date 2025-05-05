@@ -59,7 +59,7 @@ WORKDIR /app
 WORKDIR /app/cmccdb-interface
 COPY cmccdb-interface/setup.py cmccdb-interface/README.md ./
 RUN pip install --upgrade pip \
-   && pip install gunicorn wheel
+   && pip install gunicorn wheel 
 # https://stackoverflow.com/a/60511098.
 RUN python setup.py egg_info \
    && pip install $(grep -v '^\[' *.egg-info/requires.txt) \

@@ -24,7 +24,7 @@
 import flask
 
 def say_hi():
-    return flask.jsonify({"response":"hi"})
+    return flask.jsonify({"response":"hi, how are you"})
 
 def flask_info():
     return flask.jsonify(flask.request.args)

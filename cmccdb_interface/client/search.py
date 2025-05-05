@@ -49,7 +49,7 @@ from rdkit import Chem
 from cmccdb_schema.proto import reaction_pb2
 
 from ..visualization import generate_text, filters
-from ..database import query
+from ..database import manage, query
 from . import handlers
 
 bp = flask.Blueprint("api", __name__, url_prefix="/client", template_folder=".")
@@ -127,7 +127,7 @@ def fetch_reactions():
 @bp.route("/api/fetch_datasets", methods=["GET"])
 def fetch_datasets():
     """Fetches info about the current datasets."""
-    database_name = flask.request.args.get("database")
+    database_name = manage.get_database_name(flask.request.args.get("database"))
 
     rows = [
         {

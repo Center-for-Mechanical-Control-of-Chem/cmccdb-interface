@@ -39,8 +39,20 @@ export default {
     }
   },
   methods: {
+    getSearchParams() {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams
+    },
+    getDBQuery() {
+      const searchParams = this.getSearchParams();
+      const db = searchParams.get("database");
+      const queryString=(db !== null && db.length) ? `?database=${db}` : "";
+      return queryString
+    },
     getReactionTable() {
-      fetch(`/api/render/${this.reaction.reaction_id}`)
+       //TODO: pass this somewhere external so we don't recompute it every time...
+      const queryString=this.getDBQuery()
+      fetch(`/api/render/${this.reaction.reaction_id}${queryString}`)
         .then(response => response.json())
         .then(responseData => {
           this.reactionTable = responseData

@@ -15,9 +15,30 @@
 -->
 
 
-
 <script>
+
 export default {
+  data: () => ({ database: "cmcc" }),
+  created() {
+    const urlParams = this.getSearchParams()
+    const db = urlParams.get("database")
+    if (db) { this.database = db }
+  },
+  methods: {
+    getSearchParams() {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams
+    },
+    reroute(event) {
+      const urlParams = this.getSearchParams()
+      if (this.database.length) {
+        urlParams.set("database", this.database)
+      } else {
+        urlParams.delete("database")
+      }
+      window.location.search = urlParams.toString()
+    }
+  }
 }
 </script>
 
@@ -33,14 +54,20 @@ nav.navbar.navbar-expand-lg.bg-light
     #navbarNav.collapse.navbar-collapse
       .navbar-nav
         .nav-item
-          router-link.nav-link(:to='{name: "browse"}') Browse
-          router-link.nav-link(:to='{name: "search"}') Search
-          router-link.nav-link(:to='{name: "contribute"}') Contribute
+          router-link.nav-link(:to='{name: "browse", query:{"database":$route.query.database}}') Browse
+          router-link.nav-link(:to='{name: "search", query:{"database":$route.query.database}}') Search
+          router-link.nav-link(:to='{name: "contribute", query:{"database":$route.query.database}}') Contribute
         .nav-item
           a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") GitHub
         .nav-item
           router-link.nav-link(:to='{name: "about"}') About
-div.alt-dataset(:class="{ 'alt-visible' : $route.query.database }") Viewing a Secondary Database
+    input(
+      type="text"
+      class="float-right"
+      v-model="database"
+      @change="$event => (this.reroute(event))"
+      )
+div.alt-dataset(:class="{ 'alt-visible' : ($route.query.database) && ($route.query.database !== 'cmcc') }") Viewing a Secondary Database
 </template>
 
 <style lang="sass" scoped>

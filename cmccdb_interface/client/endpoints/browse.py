@@ -4,7 +4,7 @@ import flask
 import os
 import sys
 import psycopg2
-from cmccdb_interface.database import manage
+from cmccdb_interface.database import manage, query
 
 
 def detele_database(database_name=None, **conn_args):
@@ -16,35 +16,23 @@ def detele_database(database_name=None, **conn_args):
 
 def fetch_datasets():
     """Fetches info about the current datasets."""
-    database_name = manage.get_database_name()
-    # detele_database(database_name)
-    manage.configure_database(database_name)
-    connection = manage.connect(database_name)
+    database_name = manage.get_database_name(flask.request.args.get("database"))
 
-    rows = {}
-    with connection, connection.cursor() as cursor:
-        try:
-            cursor.execute("SELECT id, dataset_id, name, description FROM dataset")
-        except psycopg2.errors.UndefinedTable:
-            ...
-        else:
-            for row_id, dataset_id, name, description in cursor:
-                rows[row_id] = {
-                    "Dataset ID": dataset_id,
-                    "Name": name,
-                    "Description": description,
-                    "Size": 0,
-                }
-            # Get dataset sizes.
-            cursor.execute("SELECT dataset_id, COUNT(reaction_id) FROM reaction GROUP BY dataset_id")
-            for row_id, count in cursor:
-                rows[row_id]["Size"] = count
+    rows = [
+        {
+            "Dataset ID": row["dataset_id"],
+            "Name": row["name"],
+            "Description": row["description"],
+            "Size": row["size"]
+        }
+        for row in query.fetch_datasets(database_name=database_name, get_sizes=True, undefined_means_empty=True)
+    ]
     if len(rows) == 0:
         return {
-            "response":f"No datasets found for database {database_name}"
+            "response":f"No datasets found for database {database_name}, are you sure you spelled it right?"
         }
     else:
-        return list(rows.values())
+        return rows
 
 # def fetch_datasets():
 #     empty_datasets = [

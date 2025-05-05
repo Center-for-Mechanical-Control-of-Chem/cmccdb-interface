@@ -23,6 +23,18 @@ export default {
     EntityTable,
     LoadingSpinner,
   },
+  methods: {
+    getSearchParams() {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams
+    },
+    getDBQuery() {
+      const searchParams = this.getSearchParams();
+      const db = searchParams.get("database");
+      const queryString=(db.length) ? `?database=${db}` : "";
+      return queryString
+    },
+  },
   data() {
     return {
       loading: true,
@@ -68,7 +80,7 @@ export default {
         v-for='(row, idx) in entities'
       )
         .column 
-          router-link(:to='{ name: "search", query: {dataset_ids: row["Dataset ID"], limit: 100}}') {{row["Dataset ID"]}}
+          router-link(:to='{ name: "search", query: {dataset_ids: row["Dataset ID"], limit: 100, database:$route.query.database}}') {{row["Dataset ID"]}}
         .column {{row.Name}}
         .column {{row.Description?.length > 75 ? row.Description.substr(0,75)+"..." : row.Description}}
         .column {{row.Size}}
