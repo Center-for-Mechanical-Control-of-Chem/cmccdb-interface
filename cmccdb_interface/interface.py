@@ -24,6 +24,7 @@ import json
 
 from cmccdb_interface.client import search
 from cmccdb_interface.client import edit
+from cmccdb_interface.client import authentication
 from cmccdb_interface.visualization import filters
 
 # Set the ketcher distribution as the static folder.
@@ -35,6 +36,7 @@ app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
 app.jinja_env.filters.update(filters.TEMPLATE_FILTERS)  # pylint: disable=no-member
 app.register_blueprint(search.bp)
 app.register_blueprint(edit.bp)
+app.register_blueprint(authentication.bp)
 
 session_key = os.environ.get("CMCCDB_SESSION_KEY")
 session_key_file = "/app/cmccdb_session_key.json"

@@ -4,8 +4,10 @@ import flask
 import os
 import sys
 import importlib
-from cmccdb_interface.client import handlers
-from cmccdb_interface.database import manage, datasets
+from cmccdb_interface.client import handlers, authentication
+from cmccdb_interface.database import manage, datasets, backups
+
+
 
 # WEB_UPLOADER_NAME = "Web Uploader"
 # WEB_UPLOADER_EMAIL = "maboyer@tamu.edu"

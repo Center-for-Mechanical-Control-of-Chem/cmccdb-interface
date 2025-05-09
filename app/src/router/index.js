@@ -58,6 +58,11 @@ const routes =
         path : '/auth/device',
         name : 'auth-device',
         component : () => import('../views/auth/DeviceAuth.vue')
+      },
+      {
+        path : '/admin/delete',
+        name : 'admin-delete',
+        component : () => import('../views/admin/DeleteBrowse.vue')
       }
     ]
 

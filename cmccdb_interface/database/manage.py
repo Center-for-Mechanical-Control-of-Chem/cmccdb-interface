@@ -5,6 +5,7 @@ import psycopg2
 import sqlalchemy
 from sqlalchemy import orm
 from cmccdb_schema.orm import database as orm_db
+import html
 
 from . import constants
 
@@ -12,7 +13,8 @@ def get_host(host=None): return host or os.getenv("POSTGRES_HOST") or constants.
 def get_port(port=None): return int(port or os.getenv("POSTGRES_PORT") or constants.POSTGRES_PORT)
 def get_user(user=None): return user or os.getenv("POSTGRES_USER") or constants.POSTGRES_USER
 def get_password(password=None): return password or os.getenv("POSTGRES_PASSWORD") or constants.POSTGRES_PASSWORD
-def get_database_name(database_name=None): return database_name or os.getenv("POSTGRES_DATABASE") or constants.POSTGRES_DATABASE
+def get_database_name(database_name=None): 
+    return html.escape(database_name or os.getenv("POSTGRES_DATABASE") or constants.POSTGRES_DATABASE)
 
 def create_raw_connection(
     database_name=None, 
@@ -93,19 +95,49 @@ def create_database(database_name=None, **conn_args):
     with conn.cursor() as cur:
         conn.autocommit = True
         cur.execute(f"CREATE DATABASE {database_name};")
-def delete_database(database_name=None, **conn_args):
+def delete_database(database_name=None, force_quit=False, **conn_args):
     database_name = manage.get_database_name(database_name)
     conn = manage.connect(isolated=True, **conn_args)
     with conn, conn.cursor() as cur:
         conn.autocommit = True
-        cur.execute(f"DROP DATABASE IF EXISTS {database_name};")
-def reset_database(database_name=None, **conn_args):
+        if force_quit:
+            cur.execute(
+                f"""
+REVOKE CONNECT ON DATABASE {database_name} FROM PUBLIC;
+SELECT 
+    pg_terminate_backend(pid) 
+FROM 
+    pg_stat_activity 
+WHERE 
+    pid <> pg_backend_pid()
+    AND datname = %(dbname)s
+    ;
+    """,
+                {"dbname": database_name}
+                )
+        cur.execute(f"DROP DATABASE IF EXISTS {database_name}")
+def reset_database(database_name=None, force_quit=False, **conn_args):
     database_name = get_database_name(database_name)
     conn = connect(isolated=True, **conn_args)
     with conn.cursor() as cur:
         conn.autocommit = True
-        cur.execute(f"DROP DATABASE IF EXISTS {database_name};")
-        cur.execute(f"CREATE DATABASE {database_name};")
+        if force_quit:
+            cur.execute(
+                f"""
+REVOKE CONNECT ON DATABASE {database_name} FROM PUBLIC;
+SELECT 
+    pg_terminate_backend(pid) 
+FROM 
+    pg_stat_activity 
+WHERE 
+    pid <> pg_backend_pid()
+    AND datname = %(dbname)s
+    ;
+    """,
+                {"dbname": database_name}
+                )
+        cur.execute(f"DROP DATABASE IF EXISTS {database_name}")
+        cur.execute(f"CREATE DATABASE {database_name}", {"dbname":database_name})
 def delete_dataset(dataset_id, database_name=None, **conn_args):
     with get_session(database_name=database_name, **conn_args) as session:
         orm_db.delete_dataset(dataset_id, session)

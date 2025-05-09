@@ -44,6 +44,7 @@ export default {
 
 <style lang="sass">
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap')
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0')
 @import '@/styles/vars'
 body
   font-family: 'Roboto', sans-serif

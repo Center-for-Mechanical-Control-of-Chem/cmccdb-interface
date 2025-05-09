@@ -18,11 +18,21 @@
 <script>
 
 export default {
-  data: () => ({ database: "cmcc" }),
+  data: () => ({
+    database: "cmcc", 
+    user: {
+        name: null,
+        email: null,
+        username: null,
+        cmccMember: null,
+        ghAuthenticated: false
+      }
+    }),
   created() {
     const urlParams = this.getSearchParams()
     const db = urlParams.get("database")
     if (db) { this.database = db }
+    this.getUserData()
   },
   methods: {
     getSearchParams() {
@@ -37,6 +47,28 @@ export default {
         urlParams.delete("database")
       }
       window.location.search = urlParams.toString()
+    },
+    ghAuthenticate() {
+      const searchParams = new URLSearchParams("")
+      searchParams.set("origin_url", window.location)
+      window.location.href = "/api/authenticate?" + searchParams.toString()
+    },
+    async getUserData() {
+      if (!this.user.ghAuthenticated) {
+        fetch("/api/user-info").then(
+          (response) => response.json().then(
+            (authData) => {
+              if (authData !== null) {
+                this.user.ghAuthenticated = true
+                this.user.name = authData.name
+                this.user.email = authData.email
+                this.user.cmccMember = authData.member
+                this.user.username = authData.username
+              }
+            }
+          )
+        )
+      }
     }
   }
 }
@@ -61,12 +93,30 @@ nav.navbar.navbar-expand-lg.bg-light
           a.nav-link(href="https://github.com/Center-for-Mechanical-Control-of-Chem") GitHub
         .nav-item
           router-link.nav-link(:to='{name: "about"}') About
-    input(
-      type="text"
-      class="float-right"
-      v-model="database"
-      @change="$event => (this.reroute(event))"
-      )
+    .navbar-nav.pe-3
+      .nav-item
+        .input-group
+          .db-label.input-group-text(
+            for="db-selector"
+          ) database
+          input.form-control(
+            id="db-selector"
+            type="text"
+            v-model="database"
+            @change="$event => (this.reroute(event))"
+          )
+    .navbar-nav
+      .nav-item
+        .gh-user-info(
+          v-if="user.ghAuthenticated"
+        ) {{ user.username }}
+        .gh-login(
+          v-else
+        )  
+          a(
+            href="#"
+            @click="ghAuthenticate"
+            ) Login
 div.alt-dataset(:class="{ 'alt-visible' : ($route.query.database) && ($route.query.database !== 'cmcc') }") Viewing a Secondary Database
 </template>
 
@@ -97,6 +147,12 @@ nav
             color: $bg-primary
             &:hover
               color: $bg-secondary
+.db-label
+  color:$text-accent
+.gh-user-info
+  color:$text-accent
+.gh-login a
+  color:$text-accent
 .alt-dataset
   text-align: center
   font-size: 1.5rem
