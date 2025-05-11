@@ -105,28 +105,39 @@ export default {
   },
   methods: {
     getCompoundSVG (component) {
-      const compoundStr = component
-                        .identifiersList
-                        .find((identifier) => identifier.type == 2) //type 2 is SMILES
-                        .value
-      // prep compound
-      const compound = new reaction_pb.Compound()
-      const identifier = compound.addIdentifiers()
-      identifier.setValue(compoundStr)
-      identifier.setType(reaction_pb.CompoundIdentifier.CompoundIdentifierType.SMILES)
-      // send http request
-      return new Promise(resolve => {
-        const xhr = new XMLHttpRequest()
-        xhr.open("POST", "/api/render/compound/svg")
-        const binary = compound.serializeBinary()
-        xhr.responseType = "json"
-        xhr.onload = function () {
-          resolve(xhr.response)
+      const compoundIdentifiers = component .identifiersList
+      let smiles = compoundIdentifiers.find((identifier) => identifier.type == 2) //type 2 is SMILES
+      if (typeof smiles !== "undefined") {
+        smiles = smiles.value
+        // prep compound
+        const compound = new reaction_pb.Compound()
+        const identifier = compound.addIdentifiers()
+        identifier.setValue(smiles)
+        identifier.setType(reaction_pb.CompoundIdentifier.CompoundIdentifierType.SMILES)
+        // send http request
+        return new Promise(resolve => {
+          const xhr = new XMLHttpRequest()
+          xhr.open("POST", "/api/render/compound/svg")
+          const binary = compound.serializeBinary()
+          xhr.responseType = "json"
+          xhr.onload = function () {
+            resolve(xhr.response)
+          }
+          xhr.send(binary)
+        }).then(val => {
+          this.compoundSVG = val
+        })
+      } else {
+        let name = compoundIdentifiers.find((identifier) => identifier.type == 6) //type 6 is name
+        if (typeof name !== "undefined") {
+          this.compoundSVG = name.value
+        } else {
+          let baseId = compoundIdentifiers.find((identifier) => identifier.type > -1)
+          if (typeof baseId !== "undefined") {
+            this.compoundSVG = name.value
+          }
         }
-        xhr.send(binary)
-      }).then(val => {
-        this.compoundSVG = val
-      })
+      }
     },
   },
 }

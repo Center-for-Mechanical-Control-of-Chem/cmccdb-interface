@@ -47,9 +47,9 @@ export default {
   },
   methods: {
     async getSearchResults() {
-      this.loading = true
+      this.loading = true 
       // get raw url query string
-      this.urlQuery =  window.location.search
+      this.urlQuery =  window.location.search 
       console.log("GET: ", `/api/query${this.urlQuery}`)
       try {
         const res = await fetch(`/api/query${this.urlQuery}`, {method: "GET"})

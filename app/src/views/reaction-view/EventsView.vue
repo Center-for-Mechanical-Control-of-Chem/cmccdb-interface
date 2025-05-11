@@ -36,7 +36,7 @@ export default {
       v-for='(event, idx) in events'
       @click='eventIdx = idx'
       :class='eventIdx === idx ? "selected" : ""'
-    ) {{new Date(event.time.value).toLocaleString()}}
+    ) {{new Date(event.time?.value).toLocaleString()}}
   .details
     template(v-if='events[eventIdx].details')
       .label Details

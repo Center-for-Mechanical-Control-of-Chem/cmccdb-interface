@@ -34,11 +34,11 @@ export default {
       .label ORCID
       .label Organization
       .label Email
-      .value {{provenance.experimenter.username}}
-      .value {{provenance.experimenter.name}}
-      .value {{provenance.experimenter.orcid}}
-      .value {{provenance.experimenter.organization}}
-      .value {{provenance.experimenter.email}}
+      .value {{provenance.experimenter?.username}}
+      .value {{provenance.experimenter?.name}}
+      .value {{provenance.experimenter?.orcid}}
+      .value {{provenance.experimenter?.organization}}
+      .value {{provenance.experimenter?.email}}
   .details
     template(v-if='provenance.city')
       .label City

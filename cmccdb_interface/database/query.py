@@ -99,7 +99,7 @@ def fetch_results(
     if limit is None:
         limit = -1
     if query_props is True:
-        query_props ["dataset_id", "row_id", "proto"]
+        query_props = ["dataset_id", "row_id", "proto"]
     if query_props is None and format_results is None:
         format_results = True
     if format_results:        
@@ -1103,10 +1103,14 @@ def fetch_datasets(database_name=None, get_sizes=True, undefined_means_empty=Fal
 def prep_results_for_json(results: list[query.Result]) -> list[dict]:
     """Reads results from a query and preps for JSON encoding."""
     response = []
+    single = not isinstance(results, (list, tuple))
+    if single: results = [results]
     for result in results:
-        result = dataclasses.asdict(result)
+        if not isinstance(result, dict):
+            result = dataclasses.asdict(result)
         result["proto"] = result["proto"].hex()  # Convert to hex for JSON.
         response.append(result)
+    if single: response = response[0]
     return response
 
 def serialize_query_results(name, results):

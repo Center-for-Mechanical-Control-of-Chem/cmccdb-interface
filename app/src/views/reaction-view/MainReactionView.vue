@@ -71,7 +71,8 @@ export default {
       outcomesTab: 0,
       showRawReaction: false,
       navItems: [],
-      activeNav: "summary"
+      activeNav: "summary",
+      traceback: null
     }
   },
   computed: {
@@ -146,18 +147,27 @@ export default {
     getReactionData () {
       return new Promise(resolve => {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", `/api/fetch_reactions`)
+
+        const urlQuery =  window.location.search 
+        const endpoint = `/api/fetch_reactions${urlQuery}`
+        console.log("POST: ", endpoint)
+        xhr.open("POST", endpoint) 
         xhr.setRequestHeader("Content-Type", "application/json");
         // xhr.responseType = "arraybuffer";
         xhr.onload = () => {
           // if response is good, deserialize reaction and return object from protobuff
           let reaction = null
           if (xhr.response !== null) {
-            const hexString = JSON.parse(xhr.response)[0].proto
-            const bytes = hexToUint(hexString)
-            reaction = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
-            // sort inputs by addition order
-            reaction.inputsMap.sort((a,b) => a[1].additionOrder - b[1].additionOrder)
+            let response = JSON.parse(xhr.response)
+            if ("traceback" in response) {
+              this.traceback = response["traceback"]
+            } else {
+              const hexString = response[0].proto
+              const bytes = hexToUint(hexString)
+              reaction = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
+              // sort inputs by addition order
+              reaction.inputsMap.sort((a,b) => a[1].additionOrder - b[1].additionOrder)
+            }
           }
           resolve(reaction);
         }
@@ -216,7 +226,10 @@ export default {
     .loading(v-if='loading')
       LoadingSpinner
   transition(name="fade")
-    .reaction-transition(v-if='!loading')
+    .error-message(v-if="traceback") 
+      code 
+        pre {{ traceback }}
+    .reaction-transition(v-else-if='!loading')
       .nav-holder
         .nav
           .nav-item(

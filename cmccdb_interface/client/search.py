@@ -114,12 +114,11 @@ def fetch_reactions():
     """Fetches a list of Reactions by ID."""
     database_name = flask.request.args.get("database")
 
-    print("request", flask.request.get_json())
     reaction_ids = flask.request.get_json()
     command = query.ReactionIdQuery(reaction_ids)
     try:
         results = query.QueryHandler(database_name).run_query(command, query_props=True)
-        return flask.jsonify(prep_results_for_json(results))
+        return flask.jsonify(query.prep_results_for_json(results))
     except query.QueryException as error:
         return flask.abort(handlers.make_error_response(error, 400))
 

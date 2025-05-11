@@ -131,7 +131,10 @@ export default {
       xhr.onload = () => {
         let response = JSON.parse(xhr.response);
         if (xhr.status === 200) {
-          window.location.href = '/search?limit=100&dataset_ids='+response["dataset_id"];
+          const searchParams = this.getSearchParams()
+          searchParams.set("limit", "100")
+          searchParams.set("dataset_ids", response["dataset_id"])
+          window.location.href = '/search?' + searchParams.toString();
         } else {
           this.traceback = "ERROR: \n" + response["traceback"]
           alert("An error occured: see the traceback below")
