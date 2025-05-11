@@ -5,27 +5,36 @@ from . import backups
 from google.protobuf import text_format  # pytype: disable=import-error
 from cmccdb_schema.proto import dataset_pb2
 
-def write_datafile(file_name, data, mode='w+'):
+def write_datafile(file_name, data, username=None, mode='w+'):
     if file_name is None:
         file_name = "Untitled.pbtxt"
 
     file_id = datetime.datetime.now().isoformat()
     file_name, ext = os.path.splitext(os.path.basename(file_name))
     file_name = f"{file_name}-{file_id}{ext}"
-
-    proper_file = os.path.join(backups.BACKUP_DIR, file_name)
-    os.makedirs(backups.BACKUP_DIR, exist_ok=True)
+    
+    if username is not None:
+        backup_dir = os.path.join(backups.BACKUP_DIR, username)
+    else:
+        backup_dir = backups.BACKUP_DIR
+    proper_file = os.path.join(backup_dir, file_name)
+    os.makedirs(backup_dir, exist_ok=True)
     with open(proper_file, mode) as dataset_file:
         dataset_file.write(data)
 
     return proper_file
 
 
-def prep_pbtxt_file(file_name, data, uploader_name=None, uploader_email=None):
+def prep_pbtxt_file(
+    file_name, data, 
+    uploader_username=None,
+    uploader_name=None, 
+    uploader_email=None
+    ):
     base_name, ext = os.path.splitext(os.path.basename(file_name))
     serialized = ext == ".pb"
         
-    proper_file = write_datafile(file_name, data, mode="w+b")
+    proper_file = write_datafile(file_name, data, username=uploader_username, mode="w+b")
     if ext in {".xlsx", ".csv"}:
         import cmccdb_schema.scripts.construct_dataset as constructor
 
@@ -55,12 +64,14 @@ def create_pb_dataset(file, serialized=False):
 def prep_and_create_pb_dataset(
     file_name,
     body,
+    uploader_username=None,
     uploader_name=None, 
     uploader_email=None
 ):
     file, serialized = prep_pbtxt_file(
         file_name,
         body,
+        uploader_username=uploader_username,
         uploader_name=uploader_name, 
         uploader_email=uploader_email
         )

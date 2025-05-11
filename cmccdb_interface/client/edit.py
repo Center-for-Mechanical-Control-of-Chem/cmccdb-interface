@@ -87,6 +87,7 @@ def upload_dataset():
         dataset = datasets.prep_and_create_pb_dataset(
             file_name,
             body,
+            uploader_username=auth_info["username"],
             uploader_name=uploader_info["name"],
             uploader_email=uploader_info["email"]
             )
