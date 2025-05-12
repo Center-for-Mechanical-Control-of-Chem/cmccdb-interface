@@ -26,7 +26,7 @@ def gh_client_params(localhost=False, dev=False):
     else:
         CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID")
         CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET")
-        if CLIENT_ID is None:
+        if CLIENT_ID is None or len(CLIENT_ID.strip()) == 0:
             if os.path.exists(GITHUB_CREDENTIALS_FILE):
                 with open(GITHUB_CREDENTIALS_FILE) as credentials:
                     creds = json.load(credentials)

@@ -32,8 +32,9 @@ services:
       - POSTGRES_HOST=database
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - GH_CLIENT_ID=${GH_CLIENT_ID}
-      - GH_CLIENT_SECRET=${GH_CLIENT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY}
     image: "centerformechanochemistry/cmccdb-interface:latest"
     ports:
       - "80:80"

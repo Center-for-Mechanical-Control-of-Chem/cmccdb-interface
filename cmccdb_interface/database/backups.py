@@ -28,19 +28,25 @@ def run_command(cmd, target_dir=None, raise_errors=True):
         return res.stdout.decode("utf-8")
 
 BACKUP_DIR = "/app/cmccdb-data"
-def run_git(args):
+def run_git(args, raise_errors=True):
     if isinstance(args, str):
         args = shlex.split(args)
     cmd = ["git", *args]
-    return run_command(cmd, target_dir=BACKUP_DIR)
+    return run_command(cmd, target_dir=BACKUP_DIR, raise_errors=raise_errors)
 
+CMCCDB_DATA_MANAGER_NAME = "cmccdb-data-manager"
+CMCCDB_DATA_MANAGER_EMAIL = "cmccdb.data.manager@gmail.com"
 class GIT_ENABLED:
     flag = False
 def enable_git():
     if not GIT_ENABLED.flag:
         GIT_ENABLED.flag = True
         return {
-            "git":run_git(f"config --global --add safe.directory {BACKUP_DIR}"),
+            "git":[
+                run_git(f"config --global --add safe.directory {BACKUP_DIR}", raise_errors=False),
+                run_git(f"config user.name {CMCCDB_DATA_MANAGER_NAME}", raise_errors=False),
+                run_git(f"config user.email {CMCCDB_DATA_MANAGER_EMAIL}", raise_errors=False)
+            ],
             "keygen":run_command("bash /root/.ssh/configure_agent")
         }
 
