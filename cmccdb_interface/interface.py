@@ -39,7 +39,7 @@ app.register_blueprint(edit.bp)
 app.register_blueprint(authentication.bp)
 
 session_key = os.environ.get("CMCCDB_SESSION_KEY")
-session_key_file = "/app/cmccdb_session_key.json"
+session_key_file = "/app/credentials/cmccdb_session_key.json"
 if session_key is None:
     if os.path.exists(session_key_file):
         with open(session_key_file) as credentials:

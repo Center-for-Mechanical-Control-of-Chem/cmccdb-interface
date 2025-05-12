@@ -9,7 +9,7 @@ import uuid
 
 bp = flask.Blueprint("authentication", __name__, url_prefix="/client", template_folder=".")
 
-GITHUB_CREDENTIALS_FILE = "/app/github_auth_credentials.json"
+GITHUB_CREDENTIALS_FILE = "/app/credentials/github_auth_credentials.json"
 def gh_client_params(localhost=False, dev=False):
     if dev: 
         if os.path.exists(GITHUB_CREDENTIALS_FILE):

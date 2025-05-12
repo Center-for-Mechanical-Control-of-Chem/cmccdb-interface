@@ -38,8 +38,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - /home/github_auth_credentials.json:/app/github_auth_credentials.json
-      - /home/cmccdb_session_key.json:/app/cmccdb_session_key.json
+      - /home/cmccdb-credentials:/app/credentials:z
       - /home/cmccdb-ssh-config:/root/.ssh/:z
       - /home/cmccdb-data:/app/cmccdb-data:z
       - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
