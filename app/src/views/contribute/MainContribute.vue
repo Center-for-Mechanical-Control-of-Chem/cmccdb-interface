@@ -19,15 +19,13 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import Enumerate from "./EnumerateView"
 import Upload from "./UploadView"
 import Datasets from "./DatasetsView"
-import Reconfigure from "./ReconfigureView"
 
 export default {
   components: {
     LoadingSpinner,
     Enumerate,
     Upload,
-    Datasets,
-    Reconfigure
+    Datasets
   },
   data() {
     return {
@@ -83,8 +81,6 @@ export default {
                 | &nbsp; script in the main repository.
         transition(name="fade")
           Upload(v-if='activeTab == "Upload"')
-        transition(name="fade")
-          Reconfigure(v-if='activeTab == "Reconfigure"')
 
 </template>
 

@@ -41,6 +41,7 @@ services:
     volumes:
       - /home/cmccdb-credentials:/app/credentials:z
       - /home/cmccdb-ssh-config:/root/.ssh/:z
+      - /home/cmccdb-tmp:/app/tmp:z
       - /home/cmccdb-data:/app/cmccdb-data:z
       - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
       - /home/cmccdb-interface/patch:/app/cmccdb-interface/vue:z

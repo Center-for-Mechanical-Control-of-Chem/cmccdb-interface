@@ -27,6 +27,7 @@ def run_command(cmd, target_dir=None, raise_errors=True):
     else:
         return res.stdout.decode("utf-8")
 
+TEMPORARY_DIR = "/app/tmp"
 BACKUP_DIR = "/app/cmccdb-data"
 def run_git(args, raise_errors=True):
     if isinstance(args, str):

@@ -47,6 +47,9 @@ export default {
     },
     illumType () {
       return conditionUtil.illumType(this.conditions.illumination)
+    },
+    mechanoChemType () {
+      return conditionUtil.mechanoChemType(this.conditions.mechanochemistry)
     }
   },
 }
@@ -116,6 +119,12 @@ export default {
   .electro.details(v-if='display === "flow"')
     .label Type
     .value {{conditions.flow}}
+
+    // TODO flesh out other
+  .mechano.details(v-if='display === "mechanochemistry"')
+    template(v-if='conditions.mechanochemistry')
+      .label Mechanochemistry
+      .value {{conditions.mechanochemistry}}
 
   // TODO flesh out other
   .other.details(v-if='display === "other"')

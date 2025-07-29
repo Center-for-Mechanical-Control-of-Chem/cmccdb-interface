@@ -1,11 +1,12 @@
 import os
 import datetime
+import subprocess
 from . import backups
 
 from google.protobuf import text_format  # pytype: disable=import-error
 from cmccdb_schema.proto import dataset_pb2
 
-def write_datafile(file_name, data, username=None, mode='w+'):
+def write_datafile(file_name, data, perform_backup=True, backup_dir=None, username=None, mode='w+'):
     if file_name is None:
         file_name = "Untitled.pbtxt"
 
@@ -13,10 +14,14 @@ def write_datafile(file_name, data, username=None, mode='w+'):
     file_name, ext = os.path.splitext(os.path.basename(file_name))
     file_name = f"{file_name}-{file_id}{ext}"
     
+    if backup_dir is None:
+        if perform_backup:
+            backup_dir = backups.BACKUP_DIR
+        else:
+            backup_dir = backups.TEMPORARY_DIR
     if username is not None:
-        backup_dir = os.path.join(backups.BACKUP_DIR, username)
-    else:
-        backup_dir = backups.BACKUP_DIR
+        backup_dir = os.path.join(backup_dir, username)
+
     proper_file = os.path.join(backup_dir, file_name)
     os.makedirs(backup_dir, exist_ok=True)
     with open(proper_file, mode) as dataset_file:
@@ -27,14 +32,20 @@ def write_datafile(file_name, data, username=None, mode='w+'):
 
 def prep_pbtxt_file(
     file_name, data, 
+    perform_backup=True,
     uploader_username=None,
     uploader_name=None, 
     uploader_email=None
     ):
     base_name, ext = os.path.splitext(os.path.basename(file_name))
     serialized = ext == ".pb"
-        
-    proper_file = write_datafile(file_name, data, username=uploader_username, mode="w+b")
+    
+    proper_file = write_datafile(
+        file_name, data, 
+        perform_backup=perform_backup,
+        username=uploader_username, 
+        mode="w+b"
+        )
     if ext in {".xlsx", ".csv"}:
         import cmccdb_schema.scripts.construct_dataset as constructor
 
@@ -64,6 +75,7 @@ def create_pb_dataset(file, serialized=False):
 def prep_and_create_pb_dataset(
     file_name,
     body,
+    perform_backup=True,
     uploader_username=None,
     uploader_name=None, 
     uploader_email=None
@@ -71,6 +83,7 @@ def prep_and_create_pb_dataset(
     file, serialized = prep_pbtxt_file(
         file_name,
         body,
+        perform_backup=perform_backup,
         uploader_username=uploader_username,
         uploader_name=uploader_name, 
         uploader_email=uploader_email

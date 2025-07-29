@@ -107,3 +107,18 @@ A specific `api/register/<name>` endpoint is configured that will look for a pyt
 
 When rebuilding the proto, new versions of `protobuf` insert information about the `runtime` that the container version
 doesn't have. This may need to be commented out.
+
+---
+
+# Roadmap
+
+## Interface Updates
+
+- **Advanced Search API**: To mitigate the need to write explicit queries for every property, a generic search API should be written that extracts column names and types from the proto
+
+- **Conditions Reporting**: The Mechanochemistry tab on the `Conditions` page reports information as JSON instead of formatting properly
+
+## Schema Updates
+
+- **Reindexing of schema**: In collaboration with the ORD Schema team, a portion of overall schema space will be reserved for mechanochemical properties, so existing mechanochemical properties need to be reindexed. This will facilitate data sharing
+

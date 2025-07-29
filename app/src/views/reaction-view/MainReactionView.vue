@@ -64,6 +64,7 @@ export default {
         "illumination",
         "electrochemistry",
         "flow",
+        "mechanochemistry",
         "other",
       ],
       conditionTab: "temperature",

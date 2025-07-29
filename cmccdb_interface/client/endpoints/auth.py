@@ -167,57 +167,57 @@ import uuid
 #     else:
 #         return flask.redirect(origin_url)
 
-def resolve_redirect_uri():
-    origin_url = flask.request.args.get('origin_url', None)
-    redirect_uri = flask.request.args.get('redirect_uri')
-    if redirect_uri is None:
-        if origin_url is None:
-            redirect_uri = 'https://mechanochemistry.chem.tamu.edu/api/github-callback'
-        else:
-            origin_parse = urllib.parse.urlsplit(origin_url)
-            redirect_uri = urllib.parse.urlunsplit((
-                origin_parse.scheme,
-                origin_parse.netloc,
-                '/api/dev/api/github-callback',
-                origin_parse.query,
-                origin_parse.fragment
-            ))
-    return redirect_uri
+# def resolve_redirect_uri():
+#     origin_url = flask.request.args.get('origin_url', None)
+#     redirect_uri = flask.request.args.get('redirect_uri')
+#     if redirect_uri is None:
+#         if origin_url is None:
+#             redirect_uri = 'https://mechanochemistry.chem.tamu.edu/api/github-callback'
+#         else:
+#             origin_parse = urllib.parse.urlsplit(origin_url)
+#             redirect_uri = urllib.parse.urlunsplit((
+#                 origin_parse.scheme,
+#                 origin_parse.netloc,
+#                 '/api/dev/api/github-callback',
+#                 origin_parse.query,
+#                 origin_parse.fragment
+#             ))
+#     return redirect_uri
 
-GITHUB_API_VERSION = "2022-11-28"
-def get_oauth_headers(token=None, return_json=True):
-    headers = {"X-GitHub-Api-Version": GITHUB_API_VERSION}
-    if return_json:
-        headers["Accept"] = "application/json"
-    if token is not None:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
+# GITHUB_API_VERSION = "2022-11-28"
+# def get_oauth_headers(token=None, return_json=True):
+#     headers = {"X-GitHub-Api-Version": GITHUB_API_VERSION}
+#     if return_json:
+#         headers["Accept"] = "application/json"
+#     if token is not None:
+#         headers["Authorization"] = f"Bearer {token}"
+#     return headers
 
 
-USER_CMCC_MEMBER = "https://api.github.com/orgs/Center-for-Mechanical-Control-of-Chem/members/{username}"
-USER_CMCC_ADMIN = "https://api.github.com/orgs/Center-for-Mechanical-Control-of-Chem/members?role=admin"
-USER_BASE_URL = "https://api.github.com/user"
-def gh_user_email_data():
-    token = flask.session["github_auth_token"]
-    headers = get_oauth_headers(token)
-    user_info = requests.get(
-        USER_BASE_URL,
-        headers=headers
-    ).json()
-    org_info = requests.get(
-        USER_CMCC_MEMBER.format(username=user_info['login']),
-        headers=headers
-    ).status_code
-    org_admins = requests.get(
-        USER_CMCC_ADMIN,
-        headers=headers
-    ).json()
-    user = user_info['login']
-    is_admin = any(
-        u['login']==user
-        for u in org_admins
-    )
-    return {
-        'user':user_info, 
-        'status':{"member":org_info, "owner":is_admin}
-    }
+# USER_CMCC_MEMBER = "https://api.github.com/orgs/Center-for-Mechanical-Control-of-Chem/members/{username}"
+# USER_CMCC_ADMIN = "https://api.github.com/orgs/Center-for-Mechanical-Control-of-Chem/members?role=admin"
+# USER_BASE_URL = "https://api.github.com/user"
+# def login_info():
+#     token = flask.session["github_auth_token"]
+#     headers = get_oauth_headers(token)
+#     user_info = requests.get(
+#         USER_BASE_URL,
+#         headers=headers
+#     ).json()
+#     org_info = requests.get(
+#         USER_CMCC_MEMBER.format(username=user_info['login']),
+#         headers=headers
+#     ).status_code
+#     org_admins = requests.get(
+#         USER_CMCC_ADMIN,
+#         headers=headers
+#     ).json()
+#     user = user_info['login']
+#     is_admin = any(
+#         u['login']==user
+#         for u in org_admins
+#     )
+#     return {
+#         'user':user_info, 
+#         'status':{"member":org_info, "owner":is_admin}
+#     }

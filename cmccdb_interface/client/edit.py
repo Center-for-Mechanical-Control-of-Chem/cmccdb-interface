@@ -39,6 +39,7 @@ be URL-encoded.
 
 import os
 import flask
+import urllib
 from ..database import manage, datasets, backups
 
 from . import handlers, authentication
@@ -60,7 +61,7 @@ def get_uploader_info():
         else:
             name = os.environ.get(WEB_UPLOADER_ENV_NAME, WEB_UPLOADER_NAME)
     if email is None:
-        name = os.environ.get(WEB_UPLOADER_ENV_EMAIL, WEB_UPLOADER_EMAIL)
+        email = os.environ.get(WEB_UPLOADER_ENV_EMAIL, WEB_UPLOADER_EMAIL)
     
     return {
         "name":name,
@@ -68,6 +69,7 @@ def get_uploader_info():
     }    
 
 STAGING_DATABASE = "staging"
+HOST_PATH = "mechanochemistry.chem.tamu.edu"
 @bp.route("/api/upload", methods=["POST"])
 def upload_dataset():
     """Writes the request body to the datasets table without validation."""
@@ -77,27 +79,52 @@ def upload_dataset():
         auth_info = authentication.gh_get_cache_user_info()
         if auth_info is None:
             raise ValueError("unauthenticated users can't upload data")
-        if database_name != STAGING_DATABASE and not auth_info["member"]:
-            raise ValueError("unauthenticated users can't upload data")
+        if (database_name is None or database_name != STAGING_DATABASE) and not auth_info["member"]:
+            raise ValueError("only CMCC members can upload to primary, contribute to `staging` instead")
 
         uploader_info = get_uploader_info()
         file_name = flask.request.files['uploadFile'].filename
         body = flask.request.files['uploadFile'].read()
 
+        perform_backup = flask.request.args.get("perform_backup")
+        if (
+            (perform_backup is None or len(perform_backup.strip()) == 0)
+            and (database_name is None or database_name == "cmcc")
+        ):
+            origin_url = flask.request.args.get("origin_url")
+            if origin_url is not None:
+                origin_parse = urllib.parse.urlsplit(origin_url)
+                perform_backup = origin_parse.hostname == HOST_PATH
+            else:
+                perform_backup = False
+        if isinstance(perform_backup, str):
+            perform_backup = (
+                perform_backup != "0" 
+                and perform_backup == "false"
+            )
+        
+        print({
+            "auth":auth_info,
+            "user":uploader_info,
+            "backup":perform_backup,
+        })
         dataset = datasets.prep_and_create_pb_dataset(
             file_name,
             body,
+            perform_backup=perform_backup,
             uploader_username=auth_info["username"],
             uploader_name=uploader_info["name"],
             uploader_email=uploader_info["email"]
             )
         manage.add_dataset(dataset, database_name=database_name)
-        try:
-            backups.git_backup()
-        except OSError as e:
-            from cmccdb_schema.logging_helpers import get_logger
-            logger = get_logger('uploads')
-            logger.exception("Backup failed, maybe")
+
+        if perform_backup:
+            try:
+                backups.git_backup()
+            except OSError as e:
+                from cmccdb_schema.logging_helpers import get_logger
+                logger = get_logger('uploads')
+                logger.exception("Backup failed, maybe")
         return {'dataset_id':dataset.dataset_id}
     except Exception as error:  # pylint: disable=broad-except
         return flask.abort(handlers.make_error_response(error, 406))
@@ -126,12 +153,26 @@ def delete_dataset(dataset_id):
     try:
         auth_info = authentication.gh_get_cache_user_info()
         if auth_info is None:
-            raise ValueError("unauthenticated users can't reconfigure databases")
+            raise ValueError("unauthenticated users can't delete datasets")
         if not auth_info["owner"]:
-            raise ValueError("only CMCC admins can reconfigure databases")
+            raise ValueError("only CMCC admins can delete datasets")
 
         database_name = flask.request.args.get("database")
         manage.delete_dataset(dataset_id, database_name=database_name)
+        return handlers.make_string_response("ok")
+    except Exception as error:  # pylint: disable=broad-except
+        return flask.abort(handlers.make_error_response(error, 406))
+
+@bp.route("/api/rebuild-proto", methods=["POST"])
+def rebuild_proto(dataset_id):
+    try:
+        auth_info = authentication.gh_get_cache_user_info()
+        if auth_info is None:
+            raise ValueError("unauthenticated users can't rebuild the proto")
+        if not auth_info["owner"]:
+            raise ValueError("only CMCC admins can rebuild the proto")
+
+        datasets.rebuild_proto()
         return handlers.make_string_response("ok")
     except Exception as error:  # pylint: disable=broad-except
         return flask.abort(handlers.make_error_response(error, 406))

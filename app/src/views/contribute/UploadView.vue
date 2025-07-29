@@ -33,7 +33,8 @@ export default {
         ghAuthenticated: false
       },
       traceback: null,
-      advancedUpload: false
+      advancedUpload: false,
+      inUpload: false
     }
   },
   mounted() {
@@ -92,6 +93,11 @@ export default {
       }
       return urlParams.toString()
     },
+    getUploadEndpoint() {
+      const searchParams = this.getSearchParams()
+      searchParams.set("origin_url", window.location)
+      return "/api/upload?" + searchParams.toString()
+    },
     async setFile(e) {
       // converts uploaded file into useable array buffer
       const files = e.target.files || e.dataTransfer.files
@@ -120,15 +126,17 @@ export default {
       else if (!this.uploadFile.file)
         return alert("You must upload a file for the dataset before submitting.")
       // send dataset file to api for upload
+
+      this.inUpload = true
       
-      const urlQuery =  this.getQueryString()
       const xhr = new XMLHttpRequest();
-      const endpoint = `/api/upload?${urlQuery}`
+      const endpoint = this.getUploadEndpoint()
       xhr.open('POST', endpoint);
       console.log("POST:", this.uploadFile.name, endpoint)
       let payload = new FormData();
       payload.append('uploadFile', this.uploadFile.file);
       xhr.onload = () => {
+        this.inUpload = false;
         let response = JSON.parse(xhr.response);
         if (xhr.status === 200) {
           const searchParams = this.getSearchParams()
@@ -142,6 +150,7 @@ export default {
       }
       // Attempt to catch timeouts.
       xhr.onerror = () => {
+        this.inUpload = false;
         alert('Error: request failed (possibly due to timeout)');
       }
       xhr.send(payload);
@@ -182,7 +191,7 @@ export default {
             type="text"
             v-model="user.email"
             )
-    button#upload-submit(
+    button(
       @click='ghAuthenticate'
       v-else
       ) Login with GitHub
@@ -222,7 +231,10 @@ export default {
                   | &nbsp; file following the CMCCDB template, examples are in the &nbsp;
                   a(href="https://github.com/Center-for-Mechanical-Control-of-Chem/cmccdb-data") cmccdb-data repository
   .submit
-    button#upload-submit(@click='submitUpload') Submit Upload
+    button#upload-submit(
+      @click='submitUpload'
+      :disabled="inUpload"
+      ) Submit Upload
     input(
       id="advanced-toggle"
       type="checkbox"
@@ -272,5 +284,8 @@ export default {
     max-width: 850px
   .advanced-upload
   .basic-upload
+  #upload-submit:disabled
+    background-color: $lightgrey,
+    color: $darkgrey
 
 </style>
