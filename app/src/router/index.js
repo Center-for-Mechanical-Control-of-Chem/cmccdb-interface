@@ -40,6 +40,11 @@ const routes =
         component : () => import('../views/search/MainSearch.vue')
       },
       {
+        path : '/advanced-search',
+        name : 'advanced-search',
+        component : () => import('../views/search/AdvancedSearch.vue')
+      },
+      {
         path : '/contribute',
         name : 'contribute',
         component : () => import('../views/contribute/MainContribute.vue')
