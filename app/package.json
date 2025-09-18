@@ -8,10 +8,12 @@
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
-    "core-js": "^3.8.3",
-    "multi-range-slider-vue": "^1.1.4",
     "cmccdb-schema": "/app/cmccdb-schema/js/cmccdb-schema",
+    "core-js": "^3.8.3",
+    "google-protobuf": "^3.21.4",
+    "multi-range-slider-vue": "^1.1.4",
     "pm2": "^5.4.2",
+    "protobufjs": "^7.5.4",
     "vue": "^3.2.13",
     "vue-router": "^4.0.3",
     "vuex": "^4.1.0"

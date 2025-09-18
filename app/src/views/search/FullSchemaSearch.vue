@@ -18,19 +18,17 @@
 import ModalKetcher from '@/components/ModalKetcher'
 // import jspb from "google-protobuf"
 import reaction_pb from "cmccdb-schema"
-import SearchItemList from './SearchItemList'
-import MultiRangeSlider from "multi-range-slider-vue"
+import AdvancedSearchInput from './AdvancedSearchInput'
 
 export default {
   components: {
-    ModalKetcher,
-    SearchItemList,
-    MultiRangeSlider,
+    AdvancedSearchInput
   },
   emits: ["searchOptions"],
   data() {
     return {
         messageObj: null,
+        rootObj: reaction_pb,
         protoTree: {},
         protoSubtrees: {},
         displayedOptions: {},
@@ -52,11 +50,15 @@ export default {
       // TODO: make this less of a hack
       let retStr = getter.toString();
       // console.log(retStr);
-      const re = /proto\.cmccdb\.[\w\.]+/;
+      const re = /proto\.cmccdb\.[\w.]+/;
       let res = retStr.match(re);
       if (res !== null) {
         res = res[0].split(".", 4)
-        retStr = res[res.length-1];
+        if (res.length == 3) {
+            retStr = res[res.length-1];
+        } else {
+            retStr = res[res.length-2] + "." + res[res.length-1];
+        }
       } else {
         const tre = /type {.+?}/;
         res = retStr.match(tre);
@@ -84,6 +86,12 @@ export default {
         this.messageObj = {};
         Object.keys(reaction_pb).map((field) => {
           this.messageObj[field] = new reaction_pb[field];
+          Object.entries(reaction_pb[field]).map(([subfield, value]) => {
+              if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+                  this.messageObj[field+"."+subfield] = value;
+                  }
+              }
+            )
           }
         )
       }
@@ -122,14 +130,14 @@ export default {
     },
 
     resolveType(val, recursionDepth=-1) {
-      console.log(val, recursionDepth)
+      // console.log(val, recursionDepth)
       let rv = val;
       if (val == "string") {
         rv = val
       } else if (["int32"].includes(val)){
         rv = val
       } else if (val.startsWith("!")) {
-        rv = null;
+        rv = val;
       } else if (recursionDepth != 0) {
         //TODO: map strings to enums
         // console.log(key, "+", subkey, "=>", val);
@@ -176,6 +184,7 @@ export default {
         data = data[k];
       }
 
+      //TODO: populate this subtree
       data.push({})
     },
 
@@ -191,49 +200,31 @@ export default {
     },
 
     isListKey(field) {
-      return field.endsWith("List") || field.endsWith("||");
+      return field.endsWith("List") || field.endsWith("Map");
+    },
+
+    _setupField(types, data, field) {
+     const listField = this.isListKey(field);
+     let subdata = {};
+      if (listField) {
+        data[field] = [subdata];
+      } else {
+        data[field] = subdata;
+      }
+
+      let testField = types[field];
+      console.log(field, testField);
+      for (const [key, value] of Object.entries(testField)) {
+        if (typeof value == "object") {
+          this._setupField(testField, subdata, key)
+        }
+      }
     },
 
     loadFieldDisplay(field) {
-      this.displayedFields[field] = this.buildSubTree(this.protoTree["Reaction"][field], 3); 
+      this.displayedFields[field] = this.buildSubTree(this.protoTree["Reaction"][field], -1);
       this.displayedOptions[field] = this.displayedOptions[field] ? false:true;
-      const listField = this.isListKey(field);
-      if (listField) {
-        this.queryData[field] = [{}];
-      } else {
-        this.queryData[field] = {};
-      }
-      let qd = this.queryData[field];
-      for (const [key, value] of Object.entries(this.displayedFields[field])) {
-        if (typeof value == "object") {
-          let subdata = {};
-          const listSubfield = this.isListKey(key);
-          if (listSubfield) { subdata = [subdata]; }
-          if (listField) {
-            qd[0][key] = subdata;
-          } else {
-            qd[key] = subdata;
-          }
-          for (const [subkey, subvalue] of Object.entries(value)){
-            if (typeof subvalue == "object") {
-              let subsubval = {};
-              const listSubsubfield = this.isListKey(subkey);
-              if (listSubsubfield) { subsubval = [subsubval]; }
-              if (listSubfield) {
-                subdata[0][key] = subsubval;
-              } else {
-                subdata[key] = subsubval;
-              }
-              // this.queryData[field][key][subkey] = {}
-              // for (const [s3key, subsubvalue] of Object.entries(subvalue)){
-              //   if (typeof subsubvalue == "object") {
-              //     this.queryData[field][key][subkey][s3key] = {}
-              //   }
-              // }
-            }
-          }
-        }
-      }
+      this._setupField(this.displayedFields, this.queryData, field)
     }
   },
   mounted() {
@@ -244,6 +235,7 @@ export default {
 
 <template lang="pug">
 .search-options
+  p() {{loadProtoSubTypes("Time")}}
   .search-segment(
     v-for='field in displayedKeys'
   )
@@ -254,81 +246,13 @@ export default {
     .options-container(
       v-if='displayedOptions[field]'
     )
-      .subsection(
-        v-for='(vals, subfield) in displayedFields[field]'
-      ) 
-        .suboptions-title(v-if='typeof vals !== "string"') {{subfield}}
-        .p(v-else) {{subfield}}:
-        input(
-          v-if='vals === "string" || vals === "Concrete Type:number"'
-          v-model='queryData[field][subfield]'
-        )
-        input(
-          v-else-if='vals === "Concrete Type:boolean"'
-          type='checkbox'
-          v-model='queryData[field][subfield]'
-        )
-        .div(
-          v-else-if='typeof vals === "string"'
-        ) {{vals}}
-        .subsection(
-          v-else
-          v-for='(subsubvals, subsubfield) in vals'
-        ) {{subsubfield}}:
-          .subsection
-            input(
-              v-if='subsubvals === "string" || subsubvals === "Concrete Type:number"'
-              v-model='queryData[field][subfield][subsubfield]'
-            )
-            input(
-              v-else-if='subsubvals === "Concrete Type:boolean"'
-              type='checkbox'
-              v-model='queryData[field][subfield][subsubfield]'
-            )
-            .div(
-              v-else-if='typeof subsubvals === "string"'
-            ) {{subsubvals}}
-            .subsection(
-              v-else
-              v-for='(s3vals, s3field) in subsubvals'
-            ) {{s3field}}:
-              .subsection
-                input(
-                  v-if='s3vals === "string" || s3vals === "Concrete Type:number"'
-                  v-model='queryData[field][subfield][subsubfield][s3field]'
-                )
-                input(
-                  v-else-if='s3vals === "Concrete Type:boolean"'
-                  type='checkbox'
-                  v-model='queryData[field][subfield][subsubfield][s3field]'
-                )
-                .div(
-                  v-else
-                ) {{s3vals}}
-          button(
-            v-if='s3field.endsWith("List") || s3field.endsWith("Map")'
-            @click='addListField([field, subfield, s3field])'
-          ) +
-          button(
-            v-if='s3field.endsWith("List") || s3field.endsWith("Map")'
-            @click='dropListField([field, subfield, s3field])'
-          ) -
-        button(
-          v-if='subfield.endsWith("List") || subfield.endsWith("Map")'
-          @click='addListField([field, subfield])'
-        ) +
-        button(
-          v-if='subfield.endsWith("List") || subfield.endsWith("Map")'
-          @click='dropListField([field, subfield])'
-        ) -
-      button(
-        v-if='field.endsWith("List") || field.endsWith("Map")'
-        @click='addListField([field])'
-      ) +
-      button(
-        v-if='field.endsWith("List") || field.endsWith("Map")'
-        @click='dropListField([field])'
-      ) -
+      AdvancedSearchInput(
+        :data='this.queryData'
+        :field='field'
+        :types='this.displayedFields'
+        :labeled='false'
+        :path='[field]'
+      )
       
 </template>
 
