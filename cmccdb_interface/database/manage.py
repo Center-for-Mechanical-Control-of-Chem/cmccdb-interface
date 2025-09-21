@@ -96,8 +96,8 @@ def create_database(database_name=None, **conn_args):
         conn.autocommit = True
         cur.execute(f"CREATE DATABASE {database_name};")
 def delete_database(database_name=None, force_quit=False, **conn_args):
-    database_name = manage.get_database_name(database_name)
-    conn = manage.connect(isolated=True, **conn_args)
+    database_name = get_database_name(database_name)
+    conn = connect(isolated=True, **conn_args)
     with conn, conn.cursor() as cur:
         conn.autocommit = True
         if force_quit:

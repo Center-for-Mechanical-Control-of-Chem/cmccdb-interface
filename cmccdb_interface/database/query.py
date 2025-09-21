@@ -42,12 +42,14 @@ Note that a predicate is matched if it applies to _any_ input/output.
 from __future__ import annotations
 
 import abc
+import collections
 import dataclasses
 import enum
 import json
 import logging
 import io
 import gzip
+import re
 from typing import Dict, List, Optional, Tuple
 
 import psycopg2
@@ -60,7 +62,9 @@ from rdkit.Chem import rdChemReactions
 from cmccdb_schema import message_helpers
 from cmccdb_schema import validations
 from cmccdb_schema.proto import dataset_pb2, reaction_pb2
+from cmccdb_schema.dataset_constructor import ProtoHandler
 
+from .. import util
 from . import manage, constants
 
 logger = logging.getLogger()
@@ -872,6 +876,266 @@ class ReactionComponentQuery(ReactionQueryBase):
             limit=limit
         )
 
+
+class QueryFragment:
+    @abc.abstractmethod
+    def to_params(self):
+        ...
+    @abc.abstractmethod
+    def to_sql(self):
+        ...
+    @abc.abstractmethod
+    def validate(self):
+        ...
+
+class Selectors(enum.Enum):
+    Equals = "=="
+    NotEquals = "!="
+    Less = "<"
+    Greater = ">"
+    LessEquals = "<="
+    GreaterEquals = "<="
+    Contains = "contains"
+    Excludes = "does not contain"
+    IsAny = "any of"
+    IsNone = "none of"
+    InRange = "in range"
+    NotInRange = "not in range"
+class SchemaQueryFragment(QueryFragment):
+    def __init__(self, query_path, val, selector, dtype=None, root='reaction'):
+        self.path = tuple(query_path)
+        self.val = val
+        self.selector = Selectors(selector)
+        self.dtype = dtype
+        self.root = root
+    def to_params(self):
+        base = self.val
+        for p in reversed(self.path):
+            base = {p:base}
+        return base
+
+    def validate(self):
+        ...
+
+    _number = r'((?:[\+\-])?(?:\d*.)?\d+)'
+    _word = r'\w+'
+    selector_mapping = {
+        fr"{Selectors.Equals.value}\s*({_number}|{_word})":Selectors.Equals,
+        fr"{Selectors.NotEquals.value}\s*({_number}|{_word})":Selectors.NotEquals,
+        fr"{Selectors.Less.value}\s*{_number}":Selectors.Less,
+        fr"{Selectors.LessEquals.value}\s*{_number}":Selectors.LessEquals,
+        fr"{Selectors.Greater.value}\s*{_number}":Selectors.Greater,
+        fr"{Selectors.GreaterEquals.value}\s*{_number}":Selectors.GreaterEquals,
+        fr"{Selectors.Contains.value}\s*({_number}|{_word})":Selectors.Contains,
+        fr"{Selectors.Excludes.value}\s*({_number}|{_word})":Selectors.Excludes,
+        fr"{Selectors.IsAny.value}\s*(\[.*\])":Selectors.IsAny,
+        fr"{Selectors.IsNone.value}\s*(\[.*\])":Selectors.IsNone,
+        fr"{Selectors.InRange.value}\s*\[\s*{_number}\s*,\s*{_number}\s*\]":Selectors.InRange,
+        fr"{Selectors.NotInRange.value}\s*\[\s*{_number}\s*,\s*{_number}\s*\]":Selectors.InRange,
+    }
+
+    numeric_patterns = {
+        r'(?:[\+\-])?(?:\d*)?.\d+':float,
+        r'(?:[\+\-])?\d+':int
+    }
+    @classmethod
+    def _numeric_cast(cls, val):
+        test = val.strip()
+        for pattern, cast in cls.numeric_patterns.items():
+            if re.match(pattern, test):
+                val = cast(test)
+                break
+        return val
+    @classmethod
+    def _parse_selector(cls, match:re.Match, selector):
+        if selector in {
+            Selectors.Equals,
+            Selectors.NotEquals,
+            Selectors.Less,
+            Selectors.LessEquals,
+            Selectors.Greater,
+            Selectors.GreaterEquals
+        }:
+            return cls._numeric_cast(match.group(1))
+        elif selector in {
+            Selectors.Contains,
+            Selectors.Excludes
+        }:
+            return match.group(0)
+        elif selector in {
+            Selectors.IsAny,
+            Selectors.IsNone,
+        }:
+             return [
+                 cls._numeric_cast(t.strip())
+                 for t in match.group(0)[1:-1].split(",")
+             ]
+        else:
+            return match.groups()
+
+    @classmethod
+    def parse_val(cls, val, dtype):
+        if isinstance(val, str):
+            test = val.strip()
+            # use regex dispatch
+            for pattern, selector in cls.selector_mapping.items():
+                if match := re.match(pattern, test):
+                    return cls._parse_selector(match, selector), selector
+            else:
+                return val, Selectors.Equals
+        elif isinstance(val, (float, int)):
+            # just need to check the dtype is valid
+            return val, Selectors.Equals
+        else:
+            raise NotImplementedError(val, dtype)
+
+    _decamel_caser = re.compile(r'(?<!^)(?=[A-Z])')
+    _deid = re.compile(r'ID[A-Z]|ID$')
+    @classmethod
+    def clean_camel_case(cls, name):
+        name = re.sub(cls._deid, "Id", name)
+        return re.sub(cls._decamel_caser, "_", name).lower()
+    @classmethod
+    def from_path(cls, path, val:str):
+        path = [cls.clean_camel_case(p) for p in path]
+        if len(path) == 1 and path[0] == "dataset_id":
+            dtype = str
+            val, selector = cls.parse_val(val, dtype)
+            return cls(path, val, selector, dtype=dtype, root="dataset")
+        else:
+            dtype = reaction_pb2.Reaction
+            # type_list = [root]
+            for p in path:
+                dtype = ProtoHandler.get_field_type(dtype, p)
+                # type_list.append(root)
+            val, selector = cls.parse_val(val, dtype)
+            return cls(path, val, selector, dtype=dtype)
+
+    selector_templates = {
+        Selectors.Equals:"{query_value} = %s",
+        Selectors.NotEquals:"{query_value} <> %s",
+        Selectors.Less:"{query_value} < %s",
+        Selectors.LessEquals:"{query_value} <= %s",
+        Selectors.Greater:"{query_value} > %s",
+        Selectors.GreaterEquals:"{query_value} >= %s",
+        Selectors.IsAny:"{query_value} = ANY(%s)",
+        Selectors.IsNone:"{query_value} <> ANY(%s)",
+        Selectors.Contains:"POSITION(%s IN {query_value}) > 0",
+        Selectors.Excludes:"POSITION(%s IN {query_value}) = 0"
+    }
+    @classmethod
+    def prep_sql_query(cls, table, property, value, selector, dtype):
+        query_value = f'{table}.{property}'
+        if dtype is not None:
+            if isinstance(value, str) and dtype != str:
+                query_value = f'CAST({query_value} AS text)'
+
+        return cls.selector_templates[selector].format(query_value=query_value)
+    
+    def to_sql(self):
+        priors = (self.root,) + self.path
+        lines = [
+            f"JOIN {constants.SCHEMA_NAME}.{next} on reaction_outcome.{prev}_id = {prev}.id"
+            for next, prev in zip(self.path[:-1], priors[:-2])
+        ]
+        lines.append(
+            self.prep_sql_query(priors[-2], priors[-1], self.val, self.selector, self.dtype)
+        )
+        return "\n".join(lines)
+
+class ComposedQuery(ReactionQueryBase):
+    """
+    SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
+    FROM {constants.SCHEMA_NAME}.reaction
+    JOIN dataset ON dataset.id = reaction.dataset_id
+    """
+    components:list[QueryFragment]
+    def to_params(self):
+        params = self.components[0].to_params()
+        for c in self.components[1:]:
+            params = util.merge_dicts(params, c.to_params(), merge_iterables=False)
+        return params
+
+    def json(self) -> str:
+        return json.dumps(self.to_params())
+
+    def validate(self) -> None:
+        for c in self.components:
+            c.validate()
+
+    select_header = f"""
+SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
+FROM {constants.SCHEMA_NAME}.reaction
+JOIN dataset ON dataset.id = reaction.dataset_id
+        """.strip()
+    def to_query_components(self) -> list[sql.SQL]:
+        selects = [
+            self.select_header + "\n" + c.to_sql()
+            for c in self.components
+        ]
+        return [
+            sql.SQL(
+                "\nINTERSECT\n".join(selects)
+            )
+        ]
+
+    def run(self, cursor: psycopg2.extensions.cursor,
+            format_results: bool = None,
+            query_props: List[str] = None,
+            limit: int = None
+            ) -> List[Result]:
+        """Runs the query.
+
+        Args:
+            cursor: psycopg.cursor instance.
+            limit: Integer maximum number of matches. If None (the default), no
+                limit is set.
+
+        Returns:
+            List of Result instances.
+        """
+        components = self.to_query_components()
+        args = list(self.to_params().values())
+        if limit:
+            components.append(sql.SQL(" LIMIT %s"))
+            args.append(limit)
+        query = sql.Composed(components).join("")
+        logger.info("Running SQL command:%s", cursor.mogrify(query.as_string(cursor.connection), args).decode())
+        cursor.execute(query, args)
+        return fetch_results(
+            cursor,
+            format_results=format_results,
+            query_props=query_props,
+            limit=limit
+        )
+
+class AdvancedSearchQuery(ComposedQuery):
+    def __init__(self, components):
+        self.components = components
+
+    @classmethod
+    def flatten_json_tree(cls, js:dict):
+        paths = []
+        queue = collections.deque([[[], js]])
+        while queue:
+            path, head = queue.pop()
+            if isinstance(head, dict):
+                queue.extend(
+                    [path + [k], v]
+                    for k, v in head.items()
+                )
+            elif isinstance(head, (list, tuple)):
+                queue.extend([path, v] for v in head)
+            else:
+                paths.append((path, head))
+        return paths
+
+    @classmethod
+    def from_json(cls, js):
+        return cls([
+            SchemaQueryFragment.from_path(p, v)
+            for p,v in cls.flatten_json_tree(js)
+        ])
 
 class ReactionComponentPredicate:
     """Specifies a single reaction component predicate."""

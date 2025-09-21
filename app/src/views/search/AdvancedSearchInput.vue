@@ -9,66 +9,174 @@ export default {
         types: Object,
         labeled: Boolean,
         vectorType: Boolean,
-        path: Array
+        path: Array,
+        closed: Boolean
     },
-    emits: ["updateValue"],
+    emits: ["updateValue", "addField", "removeField"],
     data() {
-        console.log(this.field, this.data, this.types);
+        // console.log(this.field, this.index, this.data, this.types);
+        let rt = this.vectorType === true ? this.types[this.field] : this.types[this.field];
+        let props = [];
+        if (typeof rt === "object") {
+          let containerProps = [];
+          let rawProps = [];
+          for (const [key, val] of Object.entries(rt)) {
+            if (this.isContainerType(val)) {
+              containerProps.push(key);
+            } else {
+              rawProps.push(key);
+            }
+          }
+          props = [...containerProps, ...rawProps];
+        }
         return {
-            realType: this.vectorType === true ? this.types : this.types[this.field],
+            realType: rt,
+            subprops: props,
             mutData: (
                 typeof this.data === "undefined" ? {} : (
-                    this.vectorType === true ? this.data : this.data[this.field]
+                    this.vectorType === true ? this.data[this.index] : this.data[this.field]
                 )
             ),
             modelData: (
                 typeof this.data === "undefined" ? "" : (
-                    this.vectorType === true ? this.data : this.data[this.field]
+                    this.vectorType === true ? this.data[this.index] : this.data[this.field]
                 )
             ),
-            kindToggle: ""
+            kindToggle: 0,
+            kindValue: "N/A",
+            displayBody: (this.isContainerType(rt) && this.closed) ? false : true,
+            fieldLabel: this.prepFieldName(this.field)
         }
     },
     methods: {
-        emitUpdateValue() {
-            this.$emit('updateValue', {"path":this.path, "value":this.modelData})
+        toggleDisplay() { 
+          this.displayBody = !this.displayBody
+        },
+        updateValue() {
+          this.$emit('updateValue', {"path":this.path, "value":this.modelData})
+        },
+        addField() {
+          this.$emit('addField', {"path":this.path})
+        },
+        removeField() {
+          this.$emit('removeField', {"path":this.path})
         },
         bubbleValue(subdata) {
-            if (this.path.length < 2) {
-                this.$emit('updateValue', subdata)
-            } else {
-                this.$emit('bubbleValue', subdata)
+          this.$emit('updateValue', subdata);
+        },
+        bubbleAdd(subdata) {
+          this.$emit('addField', subdata);
+        },
+        bubbleRemove(subdata) {
+          this.$emit('removeField', subdata);
+        },
+        setKindToggle(subdata) {
+          this.kindValue = "N/A";
+          this.kindToggle = subdata["value"];
+          this.kindValue = this.getKindValue();
+          this.bubbleValue(subdata);
+        },
+        getKindValue() {
+          for (const [key, value] of Object.entries(this.realType["KindCase"]["allowedValues"])) {
+            if (value === this.kindToggle) {
+              return key.split("_").map(
+                (s)=>s.charAt(0) + s.slice(1, s.length).toLowerCase()
+              ).join("")
             }
-        }
+          }
+          return "MissingValue"
+        },
+        isContainerType(realType) {
+          return (
+            typeof realType !== "string" 
+            && typeof realType["allowedValues"] === "undefined"
+          )
+        },
+        prepFieldName(field) {
+          if (field.endsWith("List")) {
+            return field.slice(0, -4)
+          } else if (field.endsWith("Map")) {
+            return field.slice(0, -3)
+          } else if (field.endsWith("Id")) {
+            return field.slice(0, -2) + "ID"
+          } else if (field.endsWith("Url")) {
+            return field.slice(0, -3) + "URL"
+          } else {
+            return field
+          }
+        },
     }
 }
 </script>
 
 <template lang="pug">
 template(
-    v-if="path.length < 8"
+    v-if='typeof realType !== "undefined" && path.length < 15'
 )
-    template(
-      v-if='Array.isArray(data)'
-      v-for='(subVal, subIdx) of data'
-      )
-      AdvancedSearchInput(
-        :index='subIdx'
-        :data='subVal'
-        :types='types'
-        :labeled='true'
-        :vectorType='true'
-        :path='[...path, subIdx]'
-        @updateValue='bubbleValue'
+  template(
+    v-if='Array.isArray(mutData)'
+    )
+    .suboptions-section.block
+      .suboptions-title(v-if='labeled' @click='toggleDisplay' :class='displayBody ? "" : "closed"') {{fieldLabel}} 
+        i.material-icons expand_less
+      template(v-if="displayBody")
+        .suboptions-list(:class='labeled ? "bordered":""')
+          .suboptions-list-options
+            .suboptions-list-item(v-for='(subVal, subIdx) of mutData')
+              AdvancedSearchInput(
+                :index='subIdx'
+                :field='field'
+                :data='mutData'
+                :types='types'
+                :labeled='false'
+                :vectorType='true'
+                :path='[...path, subIdx]'
+                @updateValue='bubbleValue'
+                @addField='bubbleAdd'
+                @removeField='bubbleRemove'
+                )
+          button.addsub-list-item(
+            @click='addField'
+            ) +
+          button.addsub-list-item(
+            @click='removeField'
+            ) -
+    
+  template(
+    v-else-if='typeof realType["KindCase"] !== "undefined"'
+    )
+    .suboptions-section.block
+      .suboptions-title(v-if='labeled' @click='toggleDisplay' :class='displayBody ? "" : "closed"') {{fieldLabel}} 
+        i.material-icons expand_less
+      template(v-if="displayBody")
+        AdvancedSearchInput(
+          :field='"KindCase"'
+          :data='mutData'
+          :types='realType'
+          :labeled='false'
+          :path='[...path, "KindCase"]'
+          @updateValue='setKindToggle'
         )
-    template(
-      v-else-if='realType.hasOwnProperty("KindCase")'
-      )
-      p() {{field}} {{realType}}
-    template(
-      v-else-if='realType.hasOwnProperty("Value") && realType.hasOwnProperty("Precision") && realType.hasOwnProperty("Units")'
-      )
-       AdvancedSearchInput(
+        AdvancedSearchInput(
+          v-if='kindValue !== "N/A" && kindValue !== "KindNotSet"'
+          :field='kindValue'
+          :data='mutData'
+          :types='realType'
+          :labeled='true'
+          :path='[...path, kindValue]'
+          @updateValue='bubbleValue'
+          @addField='bubbleAdd'
+          @removeField='bubbleRemove'
+        )
+    
+  template(
+    v-else-if='(typeof realType["Value"] !== "undefined") && (typeof realType["Precision"] !== "undefined") && (typeof realType["Units"] !== "undefined")'
+    )
+    .suboptions-section.block
+      .suboptions-title(v-if='labeled' @click='toggleDisplay' :class='displayBody ? "" : "closed"') {{fieldLabel}} 
+        i.material-icons expand_less
+      template(v-if="displayBody")
+        AdvancedSearchInput(
           :field='"Units"'
           :data='mutData'
           :types='realType'
@@ -83,6 +191,8 @@ template(
           :labeled='true'
           :path='[...path, "Value"]'
           @updateValue='bubbleValue'
+          @addField='bubbleAdd'
+          @removeField='bubbleRemove'
           )
         AdvancedSearchInput(
           :field='"Precision"'
@@ -91,27 +201,43 @@ template(
           :labeled='true'
           :path='[...path, "Precision"]'
           @updateValue='bubbleValue'
-          )
-    .suboptions-section(v-else)
-      template(v-if='labeled')
-        .suboptions-title(v-if='typeof types !== "string"') {{field}}
-        .suboptions-label(v-else) {{field}}:
-      input(
+        )
+  template(
+    v-else-if='field === "allowedValues"'
+    )
+    select(
+      v-model='modelData'
+      @change='updateValue'
+    )
+      option(
+        v-for='(optVal, optName) in realType'
+        :value='optVal'
+      ) {{optName}}
+  .suboptions-section(
+    v-else 
+    :class='isContainerType(realType) ? "" : "flex"'
+  )
+    template(v-if='labeled')
+      .suboptions-title(v-if='isContainerType(realType)' @click="toggleDisplay" :class='displayBody ? "" : "closed"') {{fieldLabel}}
+        i.material-icons expand_less
+      .suboptions-label(v-else) {{fieldLabel}}:
+    template(v-if='displayBody')
+      input.string-value(
         v-if='realType === "string"'
         v-model='modelData'
         @input='updateValue'
       )
-      input(
+      input.string-value(
         v-else-if='realType === "Concrete Type:string"'
         v-model='modelData'
         @input='updateValue'
       )
-      input(
+      input.number-value(
         v-else-if='realType === "Concrete Type:number"'
         v-model='modelData'
         @input='updateValue'
       )
-      input(
+      input.boolean-value(
         v-else-if='realType === "Concrete Type:boolean"'
         type='checkbox'
         v-model='modelData'
@@ -120,20 +246,23 @@ template(
       .div(
         v-else-if='typeof realType === "string"'
       ) {{realType}}
-      .subsection(
+      template(
         v-else
-        v-for='(subsubvals, subsubfield) in realType'
+        v-for='subsubfield of subprops'
       )
-       AdvancedSearchInput(
+        AdvancedSearchInput(
           :field='subsubfield'
           :data='mutData'
           :types='realType'
           :labeled='true'
+          :closed='true'
           :path='[...path, subsubfield]'
           @updateValue='bubbleValue'
+          @addField='bubbleAdd'
+          @removeField='bubbleRemove'
           )
 template(v-else)
-   p() {{realType}}
+   p() ERROR INTERPRETING: {{fieldLabel}} {{realType}}
 
 </template>
 
@@ -142,7 +271,6 @@ template(v-else)
 @import '@/styles/transition'
 @import '@/styles/tabs'
 .search-options
-  min-height: 90vh
   .options-title
     font-size: 1.5rem
     font-weight: 700
@@ -199,11 +327,43 @@ template(v-else)
         font-size: 1.2rem
         padding: 0.5rem 1rem
   .suboptions-section
-    padding: 1rem
+    width: 100%
+    min-width: 50rem
+    display: block
+    margin-left: 0.25rem
+  .suboptions-section .flex
+      display: flex
   .suboptions-title
     display: block
-    color: $bg-primary
-  .suboptions-title
+    color: white
+    background: $bg-primary
+    font-weight: 700
+    padding:0.2rem
+    padding-left:0.5rem
+    margin-bottom: 0.1rem
+    border-top-right-radius: 0.25rem
+    border-top-left-radius: 0.25rem
+    &.closed
+      border-radius: 0.25rem
+      i
+        transform: rotate(180deg)
+  .suboptions-label
     display: flex
     color: $bg-primary
+  .suboptions-list
+    display: block
+    width: 100%
+    .bordered
+      border-bottom-left-radius: 0.25rem
+      border-bottom-right-radius: 0.25rem
+      border: 1px solid $medgrey
+  .suboptions-list-item:not(:last-child)
+    border-bottom: 1px solid $bg-primary
+  input.string-value
+    display: flex
+  button.addsub-list-item
+    width: 100px
+    margin:.1rem
+    margin-left: 0.5rem
+    text-align: center
 </style>

@@ -34,7 +34,8 @@ export default {
         displayedOptions: {},
         displayedFields: {},
         displayedKeys: null,
-        queryData: {}
+        queryData: {},
+        queryDisplay: ""
     }
   },
   // mounted() {
@@ -49,16 +50,12 @@ export default {
     reflectReturnType(getter) {
       // TODO: make this less of a hack
       let retStr = getter.toString();
-      // console.log(retStr);
       const re = /proto\.cmccdb\.[\w.]+/;
       let res = retStr.match(re);
       if (res !== null) {
-        res = res[0].split(".", 4)
-        if (res.length == 3) {
-            retStr = res[res.length-1];
-        } else {
-            retStr = res[res.length-2] + "." + res[res.length-1];
-        }
+        res = res[0].split(".");
+        res = res.slice(2, res.length);
+        retStr = res.join(".");
       } else {
         const tre = /type {.+?}/;
         res = retStr.match(tre);
@@ -71,14 +68,31 @@ export default {
 
     reflectFieldNames(root) {
       let fieldTypes = {};
-      Object.keys(Object.getPrototypeOf(root)).map( (field) => {
-        if (field.startsWith('get')) {
-          fieldTypes[field.slice(3, field.length+1)] = this.reflectReturnType(root[field]);
-        }
-      })
+      if (typeof root["allowedValues"] === "object" && root["allowedValues"] !== null) {
+        fieldTypes = root
+      } else {
+          Object.keys(Object.getPrototypeOf(root)).map( (field) => {
+            if (field.startsWith('get')) {
+              fieldTypes[field.slice(3, field.length+1)] = this.reflectReturnType(root[field]);
+            }
+          })
+      }
 
       return fieldTypes;
 
+    },
+
+    loadSubtypes(rootType, basePath) {
+      Object.entries(rootType).map(([subfield, value]) => {
+        const key = basePath+"."+subfield;
+        if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+          this.messageObj[key] = {"allowedValues":value};
+        } else if (Object.keys(value).includes("toObject")) {
+          let val = new value;
+          this.messageObj[key] = val;
+          this.loadSubtypes(value, key);
+        }
+      })
     },
 
     loadBaseMessage() {
@@ -86,14 +100,9 @@ export default {
         this.messageObj = {};
         Object.keys(reaction_pb).map((field) => {
           this.messageObj[field] = new reaction_pb[field];
-          Object.entries(reaction_pb[field]).map(([subfield, value]) => {
-              if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-                  this.messageObj[field+"."+subfield] = value;
-                  }
-              }
-            )
-          }
-        )
+          // console.log(field, Object.entries(reaction_pb[field]));
+          this.loadSubtypes(reaction_pb[field], field)
+        })
       }
       
       return this.messageObj;
@@ -101,15 +110,15 @@ export default {
 
     loadProtoSubTypes(key) {
       if (typeof this.protoTree[key] === "undefined") {
-        // console.log("!!!", key);
         const bm = this.loadBaseMessage();
+        // console.log(key, bm[key]);
         if (typeof bm[key] !== "undefined") {
           this.protoTree[key] = this.reflectFieldNames(bm[key]);
         } else {
           this.protoTree[key] = null;
         }
       }
-      
+
       return this.protoTree[key];
     },
 
@@ -118,7 +127,7 @@ export default {
     },
 
     getKeys() {
-        return Object.keys(this.getPrimaryTree());
+        return Object.keys(this.getPrimaryTree()).concat(["DatasetID"])
     },
 
     getTypes() {
@@ -130,19 +139,26 @@ export default {
     },
 
     resolveType(val, recursionDepth=-1) {
-      // console.log(val, recursionDepth)
+      const base = val;
       let rv = val;
-      if (val == "string") {
-        rv = val
-      } else if (["int32"].includes(val)){
-        rv = val
-      } else if (val.startsWith("!")) {
-        rv = val;
-      } else if (recursionDepth != 0) {
-        //TODO: map strings to enums
-        // console.log(key, "+", subkey, "=>", val);
-        // res[subkey] = null;
-        rv = this.buildSubTree(val, recursionDepth-1);
+      if (typeof val === "string") {
+          if (val === "string") {
+            rv = val
+          } else if (["int32"].includes(val)){
+            rv = val
+          } else if (val.startsWith("!")) {
+            const re = /Array<.*>/;
+            let res = val.match(re);
+            if (res !== null) {
+              rv = res[0].split("<", 2)[1].slice(0, -1);
+            } else {
+              rv = val;
+            }
+          } else if (recursionDepth != 0) {
+            //TODO: map strings to enums
+            // res[subkey] = null;
+            rv = this.buildSubTree(val, recursionDepth-1);
+          }
       }
       return rv;
     },
@@ -164,7 +180,6 @@ export default {
         if (baseTypes !== null) {
           this.protoSubtrees[key] = {};
           for (const subkey of Object.keys(baseTypes)) {
-            // console.log("...", baseTypes[subkey], this.protoSubtrees[key])
             if (typeof this.protoSubtrees[key][subkey] === "undefined") {
               this.protoSubtrees[key][subkey] = this.resolveType(baseTypes[subkey], recursionDepth)
             }
@@ -176,27 +191,42 @@ export default {
 
     },
 
+    _setupDataTree(types) {
+      let data = {};
+      for (const [field, _] of Object.entries(types)) {
+        this._setupField(types, data, field)
+      }
+      return data
+    },
     addListField(keySpec) {
       let baseFields = this.displayedFields;
       let data = this.queryData;
       for (const k of keySpec) {
-        baseFields = baseFields[k];
+        if (typeof k === "string") {
+          baseFields = baseFields[k];
+        }
         data = data[k];
       }
-
-      //TODO: populate this subtree
-      data.push({})
+      
+      let subdata = this._setupDataTree(baseFields);
+      data.push(subdata)
+    },
+    handleAddField(message) {
+      this.addListField(message["path"])
     },
 
     dropListField(keySpec) {
-      let baseFields = this.displayedFields;
+      // let baseFields = this.displayedFields;
       let data = this.queryData;
       for (const k of keySpec) {
-        baseFields = baseFields[k];
+        // baseFields = baseFields[k];
         data = data[k];
       }
 
-      baseFields.pop()
+      data.pop()
+    },
+    handleRemoveField(message) {
+      this.dropListField(message["path"])
     },
 
     isListKey(field) {
@@ -204,45 +234,118 @@ export default {
     },
 
     _setupField(types, data, field) {
-     const listField = this.isListKey(field);
-     let subdata = {};
-      if (listField) {
-        data[field] = [subdata];
-      } else {
-        data[field] = subdata;
-      }
-
       let testField = types[field];
-      console.log(field, testField);
-      for (const [key, value] of Object.entries(testField)) {
-        if (typeof value == "object") {
-          this._setupField(testField, subdata, key)
+      const listField = this.isListKey(field);
+
+      if (typeof testField === "string") {
+        if (listField) {
+          data[field] = [""];
+        } else {
+          data[field] = "";
         }
+      } else {
+        let subdata = {};
+          if (listField) {
+            data[field] = [subdata];
+          } else {
+            data[field] = subdata;
+          }
+
+          for (const [key, value] of Object.entries(testField)) {
+            if (typeof value == "object") {
+              this._setupField(testField, subdata, key)
+            }
+          }
+        }
+    },
+
+    prepFieldName(field) {
+      if (field.endsWith("List")) {
+        return field.slice(0, -4)
+      } else if (field.endsWith("Map")) {
+        return field.slice(0, -3)
+      } else if (field.endsWith("Id")) {
+        return field.slice(0, -2) + "ID"
+      } else {
+        return field
       }
     },
 
     loadFieldDisplay(field) {
-      this.displayedFields[field] = this.buildSubTree(this.protoTree["Reaction"][field], -1);
+      if (typeof this.displayedFields[field] === "undefined") {
+        if (field === "DatasetID") {
+          this.displayedFields["DatasetID"] = "string";
+        } else {
+          this.displayedFields[field] = this.buildSubTree(this.protoTree["Reaction"][field], 6);
+        }
+        this._setupField(this.displayedFields, this.queryData, field)
+      }
       this.displayedOptions[field] = this.displayedOptions[field] ? false:true;
-      this._setupField(this.displayedFields, this.queryData, field)
+    },
+
+    updateQueryData(msg) {
+      const keySpec = msg['path'];
+      const value = msg['value'];
+      // let baseFields = this.displayedFields;
+      let data = this.queryData;
+      for (const k of keySpec.slice(0, -1)) {
+        // baseFields = baseFields[k];
+        data = data[k];
+      }
+
+      data[keySpec[keySpec.length - 1]] = value;
+    },
+
+    isNonEmptyValue(subqd) {
+      return (
+        (Array.isArray(subqd) && subqd.length > 0)
+        || (typeof subqd === "object" && Object.keys(subqd).length > 0)
+        || (subqd.length > 0)
+      )
+    },
+    
+    prepQueryJSON(qd) {
+      if (Array.isArray(qd)) {
+        return qd.map(this.prepQueryJSON).filter(this.isNonEmptyValue)
+      } else if (typeof qd !== "object") {
+        return qd;
+      } else {
+        let newD = {};
+        for (const [key, subqd] of Object.entries(qd)) {
+          if (this.isNonEmptyValue(subqd)) {
+            let newSub =  this.prepQueryJSON(subqd);
+            if (this.isNonEmptyValue(newSub)) {
+              newD[key] = newSub;
+            }
+          }
+        }
+        return newD;
+      }
+    },
+
+    saveQuery() {
+      this.queryDisplay = JSON.stringify(this.prepQueryJSON(this.queryData))
     }
   },
+
   mounted() {
     this.displayedKeys = this.getKeys();
   }
 }
 </script>
 
+
 <template lang="pug">
+
 .search-options
-  p() {{loadProtoSubTypes("Time")}}
   .search-segment(
     v-for='field in displayedKeys'
   )
     .options-title(
               @click='loadFieldDisplay(field)'
               :class='displayedOptions[field] ? "" : "closed"'
-            ) {{field}}
+            ) {{prepFieldName(field)}}
+            i.material-icons expand_less
     .options-container(
       v-if='displayedOptions[field]'
     )
@@ -252,7 +355,14 @@ export default {
         :types='this.displayedFields'
         :labeled='false'
         :path='[field]'
+        @updateValue='updateQueryData'
+        @addField='handleAddField'
+        @removeField='handleRemoveField'
       )
+
+button(@click='saveQuery') Search
+
+pre() {{queryDisplay}}
       
 </template>
 
