@@ -301,6 +301,7 @@ export default {
         (Array.isArray(subqd) && subqd.length > 0)
         || (typeof subqd === "object" && Object.keys(subqd).length > 0)
         || (subqd.length > 0)
+        || (!["string", "object"].includes(typeof subqd))
       )
     },
     

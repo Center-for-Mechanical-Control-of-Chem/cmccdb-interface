@@ -69,6 +69,115 @@ from . import manage, constants
 
 logger = logging.getLogger()
 
+
+def __init__(self, database_name:str = None, user: str = None, password: str = None, host: str = None, port: int = None) -> None:
+    """Initializes an instance of OrdPostgres.
+
+    Args:
+        database_name: Text database name.
+        user: Text user name.
+        password: Text user password.
+        host: Text host name.
+        port: Integer port.
+    """
+    self._connection = manage.connect(
+        database_name=database_name,
+        user=user,
+        password=password,
+        host=host,
+        port=port,
+        readonly=True
+    )
+
+@property
+def connection(self) -> psycopg2.extensions.connection:
+    return self._connection
+
+def cursor(self) -> psycopg2.extensions.cursor:
+    return self._connection.cursor()
+
+def run_raw_query(
+    query_string,
+    *args,
+    connection=None,
+    database_name:str = None, 
+    user: str = None, 
+    password: str = None, 
+    host: str = None, 
+    port: int = None,
+    format_results:bool = False,
+    query_props:list[str] = None,
+    limit:int = None
+    ):
+
+    if connection is None:
+        connection = manage.connect(
+            database_name=database_name,
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+            readonly=True
+        )
+
+    with connection, connection.cursor() as cursor:
+        cursor.execute(sql.SQL(query_string), args)
+        res = fetch_results(
+            cursor,
+            format_results=format_results,
+            query_props=query_props,
+            limit=limit
+        )
+        connection.rollback()  # Revert rdkit runtime configuration.
+    
+    return res
+
+
+def get_schema_tables(*,
+                    connection=None,
+                    database_name: str = None,
+                    user: str = None,
+                    password: str = None,
+                    host: str = None,
+                    port: int = None,
+                    ):
+    return run_raw_query(
+        """
+SELECT TABLE_CATALOG, TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+FROM INFORMATION_SCHEMA.TABLES;
+        """,
+        connection=connection,
+        database_name=database_name,
+        user=user,
+        password=password,
+        host=host,
+        port=port
+    )
+
+
+def get_table_columns(table_name,
+                      connection=None,
+                      database_name: str = None,
+                      user: str = None,
+                      password: str = None,
+                      host: str = None,
+                      port: int = None,):
+    return run_raw_query("""
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = %s;
+""",
+                         table_name,
+                         connection=connection,
+                         database_name=database_name,
+                         user=user,
+                         password=password,
+                         host=host,
+                         port=port
+                         )
+
+
+
 @dataclasses.dataclass(frozen=True)
 class Result:
     """Container for a single result from database query."""
@@ -968,7 +1077,7 @@ class SchemaQueryFragment(QueryFragment):
         }:
              return [
                  cls._numeric_cast(t.strip())
-                 for t in match.group(0)[1:-1].split(",")
+                 for t in match.group(1)[1:-1].split(",")
              ]
         else:
             return match.groups()
@@ -980,19 +1089,33 @@ class SchemaQueryFragment(QueryFragment):
             # use regex dispatch
             for pattern, selector in cls.selector_mapping.items():
                 if match := re.match(pattern, test):
-                    return cls._parse_selector(match, selector), selector
+                    val = cls._parse_selector(match, selector)
+                    #selector
+                    break
             else:
-                return val, Selectors.Equals
+                selector = Selectors.Equals
         elif isinstance(val, (float, int)):
             # just need to check the dtype is valid
-            return val, Selectors.Equals
+            selector = Selectors.Equals
         else:
             raise NotImplementedError(val, dtype)
+        
+        if ProtoHandler.is_enum_type(dtype):
+            if isinstance(val, int):
+                for char,name in ProtoHandler.enum_num_iter(dtype):
+                    if char == val:
+                        val = name
+                        break
+        return val, selector
 
     _decamel_caser = re.compile(r'(?<!^)(?=[A-Z])')
     _deid = re.compile(r'ID[A-Z]|ID$')
     @classmethod
     def clean_camel_case(cls, name):
+        if name.endswith("List"):
+            name = name[:-4]
+        elif name.endswith("Map"):
+            name = name[:-3]
         name = re.sub(cls._deid, "Id", name)
         return re.sub(cls._decamel_caser, "_", name).lower()
     @classmethod
@@ -1001,15 +1124,25 @@ class SchemaQueryFragment(QueryFragment):
         if len(path) == 1 and path[0] == "dataset_id":
             dtype = str
             val, selector = cls.parse_val(val, dtype)
-            return cls(path, val, selector, dtype=dtype, root="dataset")
+            return cls(['dataset', path[0]], val, selector, dtype=dtype)
         else:
             dtype = reaction_pb2.Reaction
-            # type_list = [root]
-            for p in path:
+            tables = [cls.clean_camel_case(dtype.__name__)]
+            subpath = ['reaction']
+            for p in path[:-1]:
                 dtype = ProtoHandler.get_field_type(dtype, p)
+                subpath.append(
+                    cls.clean_camel_case(dtype.value_type.__name__)
+                )
                 # type_list.append(root)
+            if path[-1] == 'allowed_values':
+                subpath[-1] = path[-2]
+            else:
+                subpath.append(path[-1])
+            if hasattr(dtype, 'value_type'):
+                dtype = dtype.value_type
             val, selector = cls.parse_val(val, dtype)
-            return cls(path, val, selector, dtype=dtype)
+            return cls(subpath, val, selector, dtype=dtype)
 
     selector_templates = {
         Selectors.Equals:"{query_value} = %s",
@@ -1023,38 +1156,38 @@ class SchemaQueryFragment(QueryFragment):
         Selectors.Contains:"POSITION(%s IN {query_value}) > 0",
         Selectors.Excludes:"POSITION(%s IN {query_value}) = 0"
     }
+    selector_casts = {
+        str:'text',
+        int:'int',
+        float:'float'
+    }
     @classmethod
     def prep_sql_query(cls, table, property, value, selector, dtype):
         query_value = f'{table}.{property}'
         if dtype is not None:
-            if isinstance(value, str) and dtype != str:
-                query_value = f'CAST({query_value} AS text)'
+            for cast_type, cast_str in cls.selector_casts.items():
+                if isinstance(value, cast_type):
+                    if dtype != cast_type:
+                        query_value = f'CAST({query_value} AS {cast_str})'
+                    break
 
-        return cls.selector_templates[selector].format(query_value=query_value)
+        return "WHERE " + cls.selector_templates[selector].format(query_value=query_value)
     
     def to_sql(self):
-        priors = (self.root,) + self.path
+        # priors = (self.root,) + self.path
         lines = [
-            f"JOIN {constants.SCHEMA_NAME}.{next} on reaction_outcome.{prev}_id = {prev}.id"
-            for next, prev in zip(self.path[:-1], priors[:-2])
+            f"JOIN {constants.SCHEMA_NAME}.{next} ON {next}.{prev}_id = {prev}.id"
+            for next, prev in zip(self.path[1:-1], self.path[:-2])
         ]
         lines.append(
-            self.prep_sql_query(priors[-2], priors[-1], self.val, self.selector, self.dtype)
+            self.prep_sql_query(self.path[-2], self.path[-1], self.val, self.selector, self.dtype)
         )
         return "\n".join(lines)
 
 class ComposedQuery(ReactionQueryBase):
-    """
-    SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
-    FROM {constants.SCHEMA_NAME}.reaction
-    JOIN dataset ON dataset.id = reaction.dataset_id
-    """
     components:list[QueryFragment]
     def to_params(self):
-        params = self.components[0].to_params()
-        for c in self.components[1:]:
-            params = util.merge_dicts(params, c.to_params(), merge_iterables=False)
-        return params
+        return [c.val for c in self.components]
 
     def json(self) -> str:
         return json.dumps(self.to_params())
@@ -1079,6 +1212,20 @@ JOIN dataset ON dataset.id = reaction.dataset_id
             )
         ]
 
+    
+
+    @classmethod
+    def tree_values(cls, js:dict):
+        vals = []
+        queue = collections.deque([js])
+        while queue:
+            head = queue.pop()
+            if isinstance(head, dict):
+                queue.extend(head.values())
+            else:
+                vals.append(head)
+        return vals
+
     def run(self, cursor: psycopg2.extensions.cursor,
             format_results: bool = None,
             query_props: List[str] = None,
@@ -1095,7 +1242,7 @@ JOIN dataset ON dataset.id = reaction.dataset_id
             List of Result instances.
         """
         components = self.to_query_components()
-        args = list(self.to_params().values())
+        args = self.to_params()
         if limit:
             components.append(sql.SQL(" LIMIT %s"))
             args.append(limit)
@@ -1136,6 +1283,12 @@ class AdvancedSearchQuery(ComposedQuery):
             SchemaQueryFragment.from_path(p, v)
             for p,v in cls.flatten_json_tree(js)
         ])
+    
+    def prep_query(self):
+        components = self.to_query_components()
+        args = self.to_params()
+        qq = sql.Composed(components).join("")
+        return {'args':args, 'query':"\n".join([c.string for c in components])}
 
 class ReactionComponentPredicate:
     """Specifies a single reaction component predicate."""

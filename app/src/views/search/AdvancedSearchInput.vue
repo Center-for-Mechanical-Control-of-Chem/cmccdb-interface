@@ -18,16 +18,19 @@ export default {
         let rt = this.vectorType === true ? this.types[this.field] : this.types[this.field];
         let props = [];
         if (typeof rt === "object") {
+          let baseProps = [];
           let containerProps = [];
           let rawProps = [];
           for (const [key, val] of Object.entries(rt)) {
-            if (this.isContainerType(val)) {
+            if (["Type", "KindCase"].includes(key)) {
+              baseProps.push(key);
+            } else if (this.isContainerType(val)) {
               containerProps.push(key);
             } else {
               rawProps.push(key);
             }
           }
-          props = [...containerProps, ...rawProps];
+          props = [...baseProps, ...containerProps, ...rawProps];
         }
         return {
             realType: rt,
