@@ -108,7 +108,7 @@ def gh_get_cache_user_info():
     if email is None:
         auth_token = flask.session.get('github_auth_token')
         if auth_token is None:
-            return None
+            return {}
         user_info, cmcc_status = gh_user_email_data(auth_token)
         flask.session["github_email"] = user_info["email"]
         flask.session["github_username"] = user_info["login"]

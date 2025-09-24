@@ -16,9 +16,14 @@
 
 <script>
 import reaction_pb from "cmccdb-schema"
+import TreeDisplay from "@/components/TreeDisplay"
+import pbhelper from "@/utils/pbhelper"
 import conditionUtil from "@/utils/conditions"
 
 export default {
+  components: {
+    TreeDisplay
+  },
   props: {
     conditions: Object,
     display: String,
@@ -50,6 +55,9 @@ export default {
     },
     mechanoChemType () {
       return conditionUtil.mechanoChemType(this.conditions.mechanochemistry)
+    },
+    mechanoTypeList () {
+      return pbhelper.pbType(["Conditions", "Mechanochemistry"])
     }
   },
 }
@@ -123,8 +131,11 @@ export default {
     // TODO flesh out other
   .mechano.details(v-if='display === "mechanochemistry"')
     template(v-if='conditions.mechanochemistry')
-      .label Mechanochemistry
-      .value {{conditions.mechanochemistry}}
+      TreeDisplay(
+        :value='conditions.mechanochemistry'
+        :type='"object"'
+        :types='mechanoTypeList'
+        )
 
   // TODO flesh out other
   .other.details(v-if='display === "other"')

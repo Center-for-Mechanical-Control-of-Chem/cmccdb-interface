@@ -27,55 +27,80 @@ export default {
     SearchResults,
     LoadingSpinner
   },
-  watch: {
-    '$route.query': {
-      handler() {
-        this.getSearchResults()
-      },
-      deep: true,
-    }
-  },
   data() {
     return {
       searchResults: [],
       queryParams: "",
       searchParams: {},
-      loading: true,
+      loading: false,
       urlQuery: "",
       showOptions: false,
+      saveSearch: false,
+      queryDisplay: "",
+      traceback: ""
     }
   },
   methods: {
     async getSearchResults() {
-      this.loading = true 
+      this.traceback = "";
+      this.loading = true;
       // get raw url query string
-      this.urlQuery =  window.location.search 
-      console.log("GET: ", `/api/advanced-query${this.urlQuery}`)
-      try {
-        const res = await fetch(`/api/advanced-query${this.urlQuery}`, {method: "GET"})
-        this.searchResults = await res.json()
-        // unpack protobuff for each reaction in results
-        this.searchResults.forEach((reaction) => {
-          const bytes = hexToUint(reaction.proto)
-          reaction.data = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
-        })
-        this.loading = false
-      } catch (e) {
+      this.urlQuery = window.location.search
+      console.log("POST: ", `/api/advanced-query${this.urlQuery}`)
+      console.log(JSON.stringify(this.searchParams));
+      fetch(
+        `/api/advanced-query${this.urlQuery}`,
+        {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.searchParams)
+        }
+      ).then((response) => {
+        response.json().then(
+          (res) => {
+            if (typeof res["traceback"] !== "undefined") {
+              this.traceback = "ERROR: \n" + res["traceback"];
+              alert("An error occured: see the traceback below")
+            } else {
+              this.searchResults = res;
+              console.log(this.searchResults);
+              // unpack protobuff for each reaction in results
+              this.searchResults.forEach((reaction) => {
+                const bytes = hexToUint(reaction.proto)
+                reaction.data = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
+              })
+            }
+            this.loading = false;
+          })
+      }).catch((e) => {
+        // this.traceback = "ERROR: \n" + response["traceback"]
+        alert("An error occured: see the traceback below")
         console.log(e)
+        this.traceback = e.toString();
         this.searchResults = []
         this.loading = false
-      }
+      })
     },
     createSearch(options) {
       // reagent options
     },
-    updateSearchOptions() {
+    updateSearchOptions(searchResults) {
+      this.searchParams = searchResults;
+      if (this.saveSearch) {
+        this.queryDisplay = JSON.stringify(this.searchParams)
+      } else {
+        this.queryDisplay = "";
+        this.getSearchResults();
+      }
+
       
     }
   },
   mounted() {
     // fetch initial query
-    this.getSearchResults()
+    // this.getSearchResults()
   },
 }
 </script>
@@ -86,21 +111,31 @@ export default {
     .title Filters & Options
     .options-holder
       FullSchemaSearch(
-        @searchOptions='updateSearchOptions'
+        @updateSearch='updateSearchOptions'
+      )
+      input.boolean-value(
+        type='checkbox'
+        v-model='saveSearch'
       )
     .slide-out-tab(@click='showOptions=!showOptions')
       .line
       .line
       .line
   .search-results
+    pre(v-if='queryDisplay.length') {{queryDisplay}}
     SearchResults(
       :searchResults='searchResults'
-      v-if='!loading && searchResults?.length'
+      v-else-if='!loading && searchResults?.length'
     )
     .no-results(v-else-if='!loading && !searchResults?.length')
       .title No results. Adjust the filters and options and search again.
     .loading(v-else)
       LoadingSpinner
+  
+
+  .error-message(v-if="traceback.length")
+    code 
+      pre {{ traceback }}
 
 </template>
 

@@ -220,6 +220,38 @@ def build_query() -> Tuple[List[query.ReactionQueryBase], Optional[int]]:
         queries.append(query.ReactionComponentQuery(predicates, **kwargs))
     return queries, limit
 
+@bp.route("/api/advanced-query", methods=["POST"])
+def advanced_query():
+    database_name = flask.request.args.get("database")
+
+    # commands, limit = build_query()
+    try:
+        if not flask.request.is_json:
+            raise ValueError("Search JSON not received")
+        data = flask.request.json
+        commands = [query.AdvancedSearchQuery.from_json(data)]
+        return flask.jsonify(query.run_query(commands, database_name=database_name, prep_json=True))
+    except Exception as error:
+        return flask.abort(handlers.make_error_response(error, 400))
+
+@bp.route("/api/search/display-results", methods=["POST"])
+def render_results():
+    try:
+        if not request.is_json:
+            raise ValueError("Results JSON not received")
+        if isinstance(result_json, str):
+            result_json = json.loads(result_json)
+        flask.session['cached_search_results'] = result_json
+        return flask.redirect('/display-results')
+    except Exception as error:
+        return flask.abort(handlers.make_error_response(error, 400))
+
+@bp.route("/api/search/cached-search-results")
+def cached_search_results():
+    res = flask.session['cached_search_results']
+    #TODO: optionally clear these results
+    return flask.jsonify(res)
+
 
 @bp.route("api/ketcher/molfile", methods=["POST"])
 def get_molfile():

@@ -17,14 +17,14 @@
 <script>
 import ModalKetcher from '@/components/ModalKetcher'
 // import jspb from "google-protobuf"
-import reaction_pb from "cmccdb-schema"
+import reaction_pb, { reaction_json } from "cmccdb-schema"
 import AdvancedSearchInput from './AdvancedSearchInput'
 
 export default {
   components: {
     AdvancedSearchInput
   },
-  emits: ["searchOptions"],
+  emits: ["updateSearch"],
   data() {
     return {
         messageObj: null,
@@ -35,7 +35,8 @@ export default {
         displayedFields: {},
         displayedKeys: null,
         queryData: {},
-        queryDisplay: ""
+        queryDisplay: "",
+        fieldMaps: {}
     }
   },
   // mounted() {
@@ -47,33 +48,97 @@ export default {
   // },
   methods: {
 
-    reflectReturnType(getter) {
-      // TODO: make this less of a hack
-      let retStr = getter.toString();
-      const re = /proto\.cmccdb\.[\w.]+/;
-      let res = retStr.match(re);
-      if (res !== null) {
-        res = res[0].split(".");
-        res = res.slice(2, res.length);
-        retStr = res.join(".");
-      } else {
-        const tre = /type {.+?}/;
-        res = retStr.match(tre);
+    parseMessageFieldMap(root) {
+      if (typeof root.deserializeBinaryFromReader !== "undefined") {
+        const deserializerBody = root.deserializeBinaryFromReader.toString();
+        const re = /case (\d+):\s*var\s*value\s*=\s*([^;]+)/g;
+        let res = deserializerBody.match(re);
         if (res !== null) {
-          retStr = res[0].split("{")[1].slice(0, -1);
+          let typeMap = {}
+          res.map((td) => {
+            let r2 = td.match(/case (\d+):\s*var\s*value\s*=\s*([^;]+)/);
+            const num = parseInt(r2[1]);
+            const tc = r2[2];
+            typeMap[num] = this.parseTypeField(tc);
+          })
+          return typeMap;
+        } else {
+          return null;
+        }
+      }
+    },
+
+    parseTypeField(tc) {
+      let res = tc.match(/new\s*proto\.cmccdb\.([^()]+)/);
+      if (res !== null) {
+        return res[1];
+      } else {
+        // console.log(tc);
+        res = tc.match(/reader.read(\w+)/);
+        if (res !== null) {
+          return res[1].toLowerCase();
+        } else {
+          res = tc.match(/msg.get(\w+)/);
+          if (res !== null) {
+            return res[1];
+          } else {
+            return tc
+          }
+        }
+      }
+
+    },
+
+    reflectReturnType(baseMap, root, field, allowImplicit=false) {
+      // TODO: make this less of a hack
+
+      const getter = root[field];
+      let retStr = getter.toString();
+      // console.log(retStr);
+      if (allowImplicit) {
+        const re = /proto\.cmccdb\.[\w.]+/;
+        let res = retStr.match(re);
+        if (res !== null) {
+          res = res[0].split(".");
+          res = res.slice(2, res.length);
+          retStr = res.join(".");
+        } else {
+          const tre = /type {.+?}/;
+          res = retStr.match(tre);
+          if (res !== null) {
+            retStr = res[0].split("{")[1].slice(0, -1);
+          }
+        }
+      } else {
+        const re = /jspb.Message.get\w+\(([^()]+)\)/;
+        let res = retStr.match(re);
+        if (res !== null) {
+          let rmatch = res[1].match(/\d+/);
+          let num = parseInt(rmatch[0]);
+          retStr = baseMap[num]
         }
       }
       return retStr;
     },
 
-    reflectFieldNames(root) {
+    loadBaseFields(key) {
+      // console.log(reaction_pb["reaction_json"]);
+      if (typeof this.fieldMaps[key] === "undefined") {
+        this.fieldMaps[key] = this.parseMessageFieldMap(reaction_pb[key]);
+      }
+      return this.fieldMaps[key];
+    },
+
+    reflectFieldNames(typeDat, baseMsg, key) {
       let fieldTypes = {};
+      const root = baseMsg[key];
       if (typeof root["allowedValues"] === "object" && root["allowedValues"] !== null) {
-        fieldTypes = root
+        fieldTypes = root;
       } else {
+          const bm = this.loadBaseFields(key);
           Object.keys(Object.getPrototypeOf(root)).map( (field) => {
             if (field.startsWith('get')) {
-              fieldTypes[field.slice(3, field.length+1)] = this.reflectReturnType(root[field]);
+              fieldTypes[field.slice(3, field.length+1)] = this.reflectReturnType(bm, root, field);
             }
           })
       }
@@ -113,7 +178,7 @@ export default {
         const bm = this.loadBaseMessage();
         // console.log(key, bm[key]);
         if (typeof bm[key] !== "undefined") {
-          this.protoTree[key] = this.reflectFieldNames(bm[key]);
+          this.protoTree[key] = this.reflectFieldNames(reaction_pb, bm, key);
         } else {
           this.protoTree[key] = null;
         }
@@ -123,7 +188,8 @@ export default {
     },
 
     getPrimaryTree() {
-      return this.buildSubTree("Reaction", 1)
+      return reaction_pb["reaction_json"];
+      // return this.buildSubTree("Reaction", 1)
     },
 
     getKeys() {
@@ -164,30 +230,31 @@ export default {
     },
 
     buildSubTree(key, recursionDepth=-1) {
-      if (typeof this.protoSubtrees[key] === "undefined" || this.protoSubtrees[key] === null) {
-        if (this.loadProtoSubTypes(key) !== null) {
-          let baseTypes = this.loadProtoSubTypes(key);
-          let res = {};
-          for (const subkey of Object.keys(baseTypes)) {
-            res[subkey] = this.resolveType(baseTypes[subkey], recursionDepth)
-          }
-          this.protoSubtrees[key] = res;
-        } else {
-          this.protoSubtrees[key] = "Concrete Type:" + key;
-        }
-      } else {
-        let baseTypes = this.loadProtoSubTypes(key);
-        if (baseTypes !== null) {
-          this.protoSubtrees[key] = {};
-          for (const subkey of Object.keys(baseTypes)) {
-            if (typeof this.protoSubtrees[key][subkey] === "undefined") {
-              this.protoSubtrees[key][subkey] = this.resolveType(baseTypes[subkey], recursionDepth)
-            }
-          }
-        }
-      }
+      return reaction_pb.reaction_json[key];
+      // if (typeof this.protoSubtrees[key] === "undefined" || this.protoSubtrees[key] === null) {
+      //   if (this.loadProtoSubTypes(key) !== null) {
+      //     let baseTypes = this.loadProtoSubTypes(key);
+      //     let res = {};
+      //     for (const subkey of Object.keys(baseTypes)) {
+      //       res[subkey] = this.resolveType(baseTypes[subkey], recursionDepth)
+      //     }
+      //     this.protoSubtrees[key] = res;
+      //   } else {
+      //     this.protoSubtrees[key] = "Concrete Type:" + key;
+      //   }
+      // } else {
+      //   let baseTypes = this.loadProtoSubTypes(key);
+      //   if (baseTypes !== null) {
+      //     this.protoSubtrees[key] = {};
+      //     for (const subkey of Object.keys(baseTypes)) {
+      //       if (typeof this.protoSubtrees[key][subkey] === "undefined") {
+      //         this.protoSubtrees[key][subkey] = this.resolveType(baseTypes[subkey], recursionDepth)
+      //       }
+      //     }
+      //   }
+      // }
 
-      return this.protoSubtrees[key];
+      // return this.protoSubtrees[key];
 
     },
 
@@ -276,7 +343,7 @@ export default {
         if (field === "DatasetID") {
           this.displayedFields["DatasetID"] = "string";
         } else {
-          this.displayedFields[field] = this.buildSubTree(this.protoTree["Reaction"][field], 6);
+          this.displayedFields[field] = reaction_json[field];//this.buildSubTree(this.protoTree["Reaction"][field], 6);
         }
         this._setupField(this.displayedFields, this.queryData, field)
       }
@@ -324,8 +391,8 @@ export default {
       }
     },
 
-    saveQuery() {
-      this.queryDisplay = JSON.stringify(this.prepQueryJSON(this.queryData))
+    updateSearch() {
+      this.$emit('updateSearch', this.prepQueryJSON(this.queryData))
     }
   },
 
@@ -361,9 +428,7 @@ export default {
         @removeField='handleRemoveField'
       )
 
-button(@click='saveQuery') Search
-
-pre() {{queryDisplay}}
+button(@click='updateSearch') Search
       
 </template>
 

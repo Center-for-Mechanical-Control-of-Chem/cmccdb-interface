@@ -53,8 +53,7 @@ export default {
         DOIs: []
       },
       mechanoOptions: {
-        treatmentType: [],
-        liquidAssisted: false
+        treatmentType: []
       },
       searchParams: {
         limit: 100
@@ -210,9 +209,9 @@ export default {
         .subtitle Reactants & Reagents
         .reagent.options
           template(v-for='(reactant, idx) in reagentOptions.reactants')
-            .draw
-              button(@click='openKetcherModal("reactants", idx)')
-                i.material-icons draw
+            //- .draw
+            //-   button(@click='openKetcherModal("reactants", idx)')
+            //-     i.material-icons draw
             .field.long 
               input(
                 type='text'
@@ -233,9 +232,9 @@ export default {
         .subtitle Products
         .reagent.options
           template(v-for='(product, idx) in reagentOptions.products')
-            .draw
-              button(@click='openKetcherModal("products", idx)')
-                i.material-icons draw
+            //- .draw
+            //-   button(@click='openKetcherModal("products", idx)')
+            //-     i.material-icons draw
             .field.long 
               input(
                 type='text'

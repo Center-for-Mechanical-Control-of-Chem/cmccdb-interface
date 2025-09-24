@@ -73,4 +73,9 @@ export default {
     return Object.keys(controlTypes)
         .find(key => controlTypes[key] == mechanoChemType)
   },
+  enumType(enumName, value) {
+    const controlTypes = enumName;
+    return Object.keys(controlTypes)
+        .find(key => controlTypes[key] == value)
+  }
 }

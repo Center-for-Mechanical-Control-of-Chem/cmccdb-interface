@@ -226,22 +226,17 @@ template(
       .suboptions-label(v-else) {{fieldLabel}}:
     template(v-if='displayBody')
       input.string-value(
-        v-if='realType === "string"'
-        v-model='modelData'
-        @input='updateValue'
-      )
-      input.string-value(
-        v-else-if='realType === "Concrete Type:string"'
+        v-if='["Concrete Type:string", "Concrete Type:str", "string", "str"].includes(realType)'
         v-model='modelData'
         @input='updateValue'
       )
       input.number-value(
-        v-else-if='realType === "Concrete Type:number"'
+        v-else-if='["Concrete Type:number", "Concrete Type:int", "Concrete Type:float", "number", "int", "float"].includes(realType)'
         v-model='modelData'
         @input='updateValue'
       )
       input.boolean-value(
-        v-else-if='realType === "Concrete Type:boolean"'
+        v-else-if='["Concrete Type:boolean", "Concrete Type:bool", "boolean", "bool"].includes(realType)'
         type='checkbox'
         v-model='modelData'
         @input='updateValue'

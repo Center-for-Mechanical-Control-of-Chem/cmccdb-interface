@@ -67,7 +67,7 @@ export default {
         "mechanochemistry",
         "other",
       ],
-      conditionTab: "temperature",
+      conditionTab: "mechanochemistry",
       workupsTab: 0,
       outcomesTab: 0,
       showRawReaction: false,

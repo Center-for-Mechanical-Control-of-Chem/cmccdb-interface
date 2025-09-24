@@ -812,12 +812,7 @@ class TreatmentQuery(ReactionQueryBase):
                 JOIN dataset ON dataset.id = reaction.dataset_id
                 JOIN {constants.SCHEMA_NAME}.reaction_conditions on reaction_conditions.reaction_id = reaction.id
                 JOIN {constants.SCHEMA_NAME}.mechanochemistry_conditions on mechanochemistry_conditions.reaction_conditions_id = reaction_conditions.id
-                WHERE CAST(mechanochemistry_conditions.type AS text) = ANY (%s)""" + (
-                    """ 
-                    AND mechanochemistry_conditions.liquid_assisted """
-                        if self._liquid_assisted else ""
-                ) + """
-                """
+                WHERE CAST(mechanochemistry_conditions.type AS text) = ANY (%s)"""
             )
         ]
         args = [self._treatments]
@@ -921,8 +916,8 @@ class ReactionComponentQuery(ReactionQueryBase):
                 exact.append(predicate)
             else:
                 other.append(predicate)
-        exact_results = self._run(exact, cursor=cursor, limit=limit)
-        other_results = self._run(other, cursor=cursor, limit=limit)
+        exact_results = self._run(exact, cursor=cursor, limit=limit, format_results=format_results, query_props=query_props)
+        other_results = self._run(other, cursor=cursor, limit=limit, format_results=format_results, query_props=query_props)
         if exact_results and other_results:
             return list(set(exact_results).intersection(set(other_results)))
         if exact_results:
@@ -936,6 +931,9 @@ class ReactionComponentQuery(ReactionQueryBase):
         predicates: List[ReactionComponentPredicate],
         cursor: psycopg2.extensions.cursor,
         limit: Optional[int] = None,
+        format_results: bool = None,
+        query_props: List[str] = None,
+
     ) -> List[Result]:
         """Runs the query for a set of predicates."""
         if not predicates:
@@ -1429,7 +1427,21 @@ class QueryHandler:
 class QueryException(Exception):
     """Exception class for ORD queries."""
 
-
+def _get_key(result, primary_key):
+    if isinstance(primary_key, str):
+        try:
+            return result[primary_key]
+        except TypeError:
+            return getattr(result, primary_key)
+    else:
+        try:
+            return result[primary_key]
+        except TypeError:
+            if primary_key == 0:
+                primary_key = 'reaction_id'
+            else:
+                primary_key = 'dataset_id'
+            return getattr(result, primary_key)
 def run_query(
     commands: list[ReactionQueryBase], limit: int | None = None, database_name: str | None = None,
     format_results:bool = None,
@@ -1459,16 +1471,16 @@ def run_query(
         if format_results is True:
             if query_props is None:
                 primary_key = 'reaction_id'
-            get_key = lambda result: getattr(result, primary_key)
+            # get_key = lambda result: _get_key(result, primary_key)
         else:
             if query_props is None:
                 primary_key = 0
             else:
                 primary_key = 'reaction_id'
-            get_key = lambda result: result[primary_key]
+            # get_key = lambda result: _get_key(result, primary_key)
         for command in commands:
             this_results = {
-                get_key(result): result 
+                _get_key(result, primary_key): result 
                 for result in connection.run_query(command, limit=None,
                                                    format_results=format_results,
                                                    query_props=query_props

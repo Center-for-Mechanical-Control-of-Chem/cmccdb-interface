@@ -47,9 +47,9 @@ export default {
     async getSearchResults() {
       this.loading = true 
       // get raw url query string
-      console.log("GET: ", `/api/dev/search/cached_search_results`)
+      console.log("GET: ", `/api/cached-search-results`)
       try {
-        const res = await fetch(`/api/dev/search/cached_search_results`, {method: "GET"})
+        const res = await fetch(`/api/cached-search-results`, {method: "GET"})
         this.searchResults = await res.json()
         // unpack protobuff for each reaction in results
         this.searchResults.forEach((reaction) => {
