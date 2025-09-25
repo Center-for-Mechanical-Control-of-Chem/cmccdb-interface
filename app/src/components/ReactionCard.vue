@@ -49,6 +49,12 @@ export default {
       const queryString=(db !== null && db.length) ? `?database=${db}` : "";
       return queryString
     },
+    getDBName() {
+      const searchParams = this.getSearchParams();
+      const db = searchParams.get("database");
+      const queryString=(db !== null && db.length) ? `${db}` : "cmcc";
+      return queryString
+    },
     getReactionTable() {
        //TODO: pass this somewhere external so we don't recompute it every time...
       const queryString=this.getDBQuery()
@@ -141,7 +147,7 @@ export default {
     .info
       .col.full
         router-link(
-          :to='{ name: "reaction-view", params: {reactionId: reaction.reaction_id}}'
+          :to='{ name: "reaction-view", params: {reactionId: reaction.reaction_id}, query:{database:getDBName()}}'
         ) 
           button View Full Details
       .col

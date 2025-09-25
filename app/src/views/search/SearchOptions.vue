@@ -320,14 +320,6 @@ export default {
             option(value="TIP_ARRAY") Tip Array
             option(value="HAND_GRIND") Hand Grinding
             option(value="TWIN_SCREW") Twin Screw
-      .section
-        .subtitle Treatment Modifiers
-        .general.options
-          label(for='liquass' style='margin-right:15px') Liquid Assisted
-          input#liquass(
-            type='checkbox'
-            v-model='mechanoOptions.liquidAssisted'
-          )
   .options-title(
     @click='showDatasetOptions = !showDatasetOptions'
     :class='showDatasetOptions ? "" : "closed"'

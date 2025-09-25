@@ -145,6 +145,16 @@ export default {
     }
   },
   methods: {
+    getSearchParams() {
+      const urlParams = new URLSearchParams(window.location.search)
+      return urlParams
+    },
+    getDBQuery() {
+      const searchParams = this.getSearchParams();
+      const db = searchParams.get("database");
+      const queryString=(db !== null && db.length) ? `?database=${db}` : "?";
+      return queryString
+    },
     getReactionData () {
       return new Promise(resolve => {
         const xhr = new XMLHttpRequest();
@@ -176,7 +186,10 @@ export default {
       })
     },
     async getReactionSummary () {
-      const res = await fetch(`/api/render/${this.reactionId}?compact=false`)
+      const urlQuery =  this.getDBQuery();
+      const endpoint = `/api/render/${this.reactionId}${urlQuery}&compact=false`;
+      console.log("fetch", endpoint);
+      const res = await fetch(endpoint);
       const data = await res.json()
       return data
     },
