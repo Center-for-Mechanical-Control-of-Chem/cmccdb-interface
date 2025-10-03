@@ -39,6 +39,11 @@ export default {
       const urlParams = new URLSearchParams(window.location.search)
       return urlParams
     },
+    inPreview() {
+      const hostname = location.host;
+      console.log(hostname);
+      return (hostname) && (hostname.startsWith('preview-'))
+    },
     reroute(event) {
       const urlParams = this.getSearchParams()
       if (this.database.length) {
@@ -75,6 +80,7 @@ export default {
 </script>
 
 <template lang="pug">
+div.alt-preview(:class="{ 'alt-visible' : inPreview() }") PREVIEW INTERFACE
 nav.navbar.navbar-expand-lg.bg-light
   .container
     a.navbar-brand(href="/")
@@ -163,6 +169,16 @@ nav
   width: 100%
   padding: 2rem
   height: 6rem
+.alt-preview
+  text-align: center
+  font-size: 1rem
+  font-variant: bold
+  background: $bg-secondary
+  color: $text-primary
+  display: none
+  width: 100%
+  padding-top: .25rem
+  height: 2rem
 .alt-visible
   display: block
 </style>

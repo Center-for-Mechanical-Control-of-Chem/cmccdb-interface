@@ -1,0 +1,12 @@
+services:
+  proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - 80:80
+      - 443:443
+      - 8070:8070
+    volumes:
+      - /home/nginx-proxy/logs:/logs:z

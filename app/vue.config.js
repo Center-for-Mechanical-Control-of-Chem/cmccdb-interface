@@ -33,6 +33,7 @@ module.exports = defineConfig({
             })
     },
     devServer: {
+      allowedHosts: "all",
       proxy: process.env.NODE_ENV === 'development' ? {
         "^/api": {
           target: "http://0.0.0.0:80",

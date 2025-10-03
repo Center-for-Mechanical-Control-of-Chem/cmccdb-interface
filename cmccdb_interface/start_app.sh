@@ -17,6 +17,13 @@
 # Runs the app with gunicorn behind a nginx proxy.
 set -e
 
+if [ "$CMCCDB_LAUNCH_DEV_INTERFACE" ]; then
+  curdir=$PWD
+  cd /app/cmccdb-interface/dev
+  npm run serve -- --port=95 &
+  cd $curdir
+fi
+
 # Start nginx server.
 nginx -g 'daemon off;' &
 
