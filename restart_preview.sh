@@ -4,7 +4,6 @@
 # sudo podman container rm cmccdb_interface_database_1
 cd /home/cmccdb-interface/
 cp -r ../cmccdb-schema/js/cmccdb-schema app/node_modules/
-cp -r ../cmccdb-dependencies/google-protobuf app/node_modules/
 
 cd /home/cmccdb-interface/cmccdb_interface
 # restart the container
