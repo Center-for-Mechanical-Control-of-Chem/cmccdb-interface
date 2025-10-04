@@ -77,7 +77,7 @@ export default {
     getDB() {
       const searchParams = this.getSearchParams()
       const db = searchParams.get("database")
-      const queryString=(db.length) ? db : "cmcc"
+      const queryString=(typeof db === "string" && db.length) ? db : "cmcc"
       return queryString
     },
     getQueryString() {

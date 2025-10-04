@@ -10,13 +10,26 @@ import uuid
 bp = flask.Blueprint("authentication", __name__, url_prefix="/client", template_folder=".")
 
 GITHUB_CREDENTIALS_FILE = "/app/credentials/github_auth_credentials.json"
-def gh_client_params(localhost=False, dev=False):
-    if dev: 
+def gh_client_params(localhost=False, dev=False, preview=False, preview_dev=False):
+    print("LOADING CLIENT PARAMS FROM:", dict(localhost=localhost, dev=dev, preview=preview, preview_dev=preview_dev))
+    if preview_dev: 
+        if os.path.exists(GITHUB_CREDENTIALS_FILE):
+            with open(GITHUB_CREDENTIALS_FILE) as credentials:
+                creds = json.load(credentials)
+            CLIENT_ID = creds.get("preview_dev_client_id")
+            CLIENT_SECRET = creds.get("preview_dev_client_secret")
+    elif dev: 
         if os.path.exists(GITHUB_CREDENTIALS_FILE):
             with open(GITHUB_CREDENTIALS_FILE) as credentials:
                 creds = json.load(credentials)
             CLIENT_ID = creds.get("dev_client_id")
             CLIENT_SECRET = creds.get("dev_client_secret")
+    elif preview: 
+        if os.path.exists(GITHUB_CREDENTIALS_FILE):
+            with open(GITHUB_CREDENTIALS_FILE) as credentials:
+                creds = json.load(credentials)
+            CLIENT_ID = creds.get("preview_client_id")
+            CLIENT_SECRET = creds.get("preview_client_secret")
     elif localhost:
         if os.path.exists(GITHUB_CREDENTIALS_FILE):
             with open(GITHUB_CREDENTIALS_FILE) as credentials:
@@ -52,7 +65,9 @@ def gh_device_authenticate():
     origin_url = flask.request.args.get('origin_url')
     creds = gh_client_params(
         localhost=origin_url is not None and '127.0.0.1' in origin_url,
-        dev=origin_url is not None and 'mechanochemistry-db-01-dev' in origin_url
+        dev=origin_url is not None and 'mechanochemistry-db-01-dev' in origin_url,
+        preview=origin_url is not None and 'preview-mechanochemistry' in origin_url,
+        preview_dev=origin_url is not None and 'preview-mechanochemistry-db-01-dev' in origin_url
         )
     device_code = flask.request.args.get("device_code")
     if device_code is None:
@@ -190,7 +205,9 @@ def gh_authenticate():
     flask.session["gh_redirect_uri"] = redirect_uri
     params = gh_client_params(
         localhost='127.0.0.1' in redirect_uri,
-        dev='mechanochemistry-db-01-dev' in redirect_uri
+        dev='mechanochemistry-db-01-dev' in redirect_uri,
+        preview='preview-mechanochemistry' in redirect_uri,
+        preview_dev='preview-mechanochemistry-db-01-dev' in redirect_uri
         )
     query_params = {
             "redirect_uri":redirect_uri,
@@ -212,7 +229,9 @@ def gh_oauth_callback():
         redirect_uri = resolve_redirect_uri()
     params = gh_client_params(    
         localhost='127.0.0.1' in redirect_uri,
-        dev='mechanochemistry-db-01-dev' in redirect_uri
+        dev='mechanochemistry-db-01-dev' in redirect_uri,
+        preview='preview-mechanochemistry' in redirect_uri,
+        preview_dev='preview-mechanochemistry-db-01-dev' in redirect_uri
         )
     state = flask.session.get("gh_salt") # use this to avoid MiM attacks
     auth_info = requests.post(
