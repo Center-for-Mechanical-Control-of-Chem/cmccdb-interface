@@ -1,10 +1,7 @@
-# sudo podman stop cmccdb_interface_web_1 
-# sudo podman stop cmccdb_interface_database_1
-# sudo podman container rm cmccdb_interface_web_1
-# sudo podman container rm cmccdb_interface_database_1
-cd /home/cmccdb-interface/
-cp -r ../cmccdb-schema/js/cmccdb-schema app/node_modules/
-
-cd /home/cmccdb-interface/cmccdb_interface
-# restart the container
-sudo podman compose --file='docker-compose-preview.yml' --podman-run-args='--replace' up --detach
+#!/usr/bin/env bash
+# The preview database must already be running; replace only the preview web.
+set -euo pipefail
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+engine=${CONTAINER_ENGINE:-podman}
+"$engine" compose --file "$repo_root/cmccdb_interface/docker-compose-preview.yml" \
+  up --detach --no-build --no-deps --force-recreate web_preview

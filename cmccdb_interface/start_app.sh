@@ -15,13 +15,19 @@
 
 #
 # Runs the app with gunicorn behind a nginx proxy.
-set -e
+set -euo pipefail
 
-if [ "$CMCCDB_LAUNCH_DEV_INTERFACE" ]; then
+if [ "${CMCCDB_LAUNCH_DEV_INTERFACE:-false}" = "true" ]; then
   curdir=$PWD
   cd /app/cmccdb-interface/dev
+  dependency_hash=$(sha256sum package.json package-lock.json /app/cmccdb-schema/js/cmccdb-schema/package.json | sha256sum | cut -d ' ' -f 1)
+  installed_hash=$(cat node_modules/.cmccdb-dependencies.sha256 2>/dev/null || true)
+  if [ "$dependency_hash" != "$installed_hash" ]; then
+    npm ci --no-audit --no-fund
+    printf '%s\n' "$dependency_hash" > node_modules/.cmccdb-dependencies.sha256
+  fi
   npm run serve -- --port=95 &
-  cd $curdir
+  cd "$curdir"
 fi
 
 # Start nginx server.
@@ -29,7 +35,7 @@ nginx -g 'daemon off;' &
 
 # Start gunicorn.
 LOG_FORMAT='GUNICORN %(t)s %({user-id}o)s %(U)s %(s)s %(L)s %(b)s %(f)s "%(r)s" "%(a)s"'
-gunicorn cmccdb_interface.interface:app \
+exec gunicorn cmccdb_interface.interface:app \
   --bind unix:/run/gunicorn.sock \
   --workers 2 \
   --access-logfile - \

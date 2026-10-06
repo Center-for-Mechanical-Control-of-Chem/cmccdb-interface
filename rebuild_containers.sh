@@ -1,15 +1,19 @@
-
-cd /home/cmccdb-interface/cmccdb_interface
-sudo podman build --file Dockerfile -t centerformechanochemistry/cmccdb-interface ../..
-export PGPASSWORD=postgres
-# Use a non-standard PGDATA so the database persists; see
-# https://nickjanetakis.com/blog/docker-tip-79-saving-a-postgres-database-in-a-docker-image.
-# CONTAINER="$(sudo podman run --name cmccdb_database --rm -d -p 5432:5432 -e POSTGRES_PASSWORD=${PGPASSWORD} -e PGDATA=/data mcs07/postgres-rdkit)"
-# sudo podman commit "${CONTAINER}" "centerformechanochemistry/cmccdb-postgres:test"
-# sudo podman stop "${CONTAINER}"
-cd /home/cmccdb-interface/cmccdb_interface
-# clean up the existing interface for saftey
-# sudo podman container stop cmccdb_interface_web_1
-# sudo podman rm cmccdb_interface_web_1
-
-. /home/cmccdb-interface/restart_containers.sh
+#!/usr/bin/env bash
+# Build and replace only the requested web service; leave the database running.
+set -euo pipefail
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+export CONTAINER_ENGINE=${CONTAINER_ENGINE:-podman}
+target=${1:-production}
+case "$target" in
+  production)
+    image=${CMCCDB_INTERFACE_IMAGE:-cmccdb/interface:2025.09.3}
+    restart_script=restart_containers.sh
+    ;;
+  preview)
+    image=${CMCCDB_PREVIEW_IMAGE:-cmccdb/interface-preview:2025.09.3}
+    restart_script=restart_preview.sh
+    ;;
+  *) echo "Target must be production or preview" >&2; exit 1 ;;
+esac
+bash "$repo_root/build_image.sh" "$target" "$image"
+bash "$repo_root/$restart_script"

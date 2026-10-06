@@ -16,6 +16,7 @@
 
 const {defineConfig} = require('@vue/cli-service')
 const path = require('path')
+const ketcherDirectory = process.env.CMCCDB_KETCHER_DIR || path.resolve(__dirname, 'src/ketcher')
 
 module.exports = defineConfig({
     transpileDependencies: true,
@@ -23,7 +24,14 @@ module.exports = defineConfig({
         config.plugin('copy')
             .tap(entries => {
                 entries[0].patterns.push({
-                    from: path.resolve(__dirname, 'src/ketcher/templates'),
+                    from: ketcherDirectory,
+                    to: path.resolve(__dirname, 'dist/ketcher'),
+                    toType: 'dir',
+                    noErrorOnMissing: false,
+                    globOptions: {ignore: ['**/.DS_Store']},
+                })
+                entries[0].patterns.push({
+                    from: path.join(ketcherDirectory, 'templates'),
                     to: path.resolve(__dirname, 'dist/templates'),
                     toType: 'dir',
                     noErrorOnMissing: false,

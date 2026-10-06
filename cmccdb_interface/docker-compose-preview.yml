@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
 services:
   database_preview:
-    image: "mcs07/postgres-rdkit:latest"
+    image: "${CMCCDB_PREVIEW_DATABASE_IMAGE:-mcs07/postgres-rdkit:latest}"
     command: [ "postgres", "-c", "log_statement=all" ]
     ports:
       - "5435:5432"
@@ -38,7 +37,12 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY}
       - CMCCDB_LAUNCH_DEV_INTERFACE=true
-    image: "centerformechanochemistry/cmccdb-interface:latest"
+    image: "${CMCCDB_PREVIEW_IMAGE:-cmccdb/interface-preview:2025.09.3}"
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: cmccdb-interface/cmccdb_interface/Dockerfile
+      target: preview
     ports:
       - "90:80"
       - "91:95"
@@ -48,6 +52,11 @@ services:
       - /home/cmccdb-tmp:/app/tmp:z
       - /home/cmccdb-data:/app/cmccdb-data:z
       - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
-      - /home/cmccdb-interface/patch:/app/cmccdb-interface/vue:z
+      - /home/cmccdb-schema/js/cmccdb-schema:/app/cmccdb-schema/js/cmccdb-schema:z
       - /home/cmccdb-interface/app:/app/cmccdb-interface/dev:z
+      - preview-node-modules:/app/cmccdb-interface/dev/node_modules
+      - preview-npm-cache:/root/.npm
       - /home/cmccdb-interface/cmccdb_interface:/app/cmccdb-interface/cmccdb_interface:z
+volumes:
+  preview-node-modules:
+  preview-npm-cache:

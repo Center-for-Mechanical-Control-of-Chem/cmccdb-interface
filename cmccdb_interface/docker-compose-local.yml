@@ -1,0 +1,42 @@
+# Fresh deployment. This deliberately uses a new volume, not /home/cmcc-database.
+services:
+  database:
+    image: cmccdb/postgres-rdkit:16-2025.09.3
+    build:
+      context: ../../docker-postgres-rdkit
+    environment:
+      POSTGRES_DB: cmcc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - cmccdb-postgres16:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d cmcc"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  web:
+    image: cmccdb/interface:2025.09.3
+    build:
+      context: ../..
+      dockerfile: cmccdb-interface/cmccdb_interface/Dockerfile
+      target: production
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      POSTGRES_DATABASE: cmcc
+      POSTGRES_HOST: database
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      CMCCDB_SESSION_KEY: ${CMCCDB_SESSION_KEY:?Set CMCCDB_SESSION_KEY}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    ports:
+      - "${CMCCDB_WEB_PORT:-8080}:80"
+    volumes:
+      - cmccdb-tmp:/app/tmp
+      - cmccdb-data:/app/cmccdb-data
+volumes:
+  cmccdb-postgres16:
+  cmccdb-tmp:
+  cmccdb-data:

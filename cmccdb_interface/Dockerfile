@@ -1,97 +1,76 @@
-# Copyright 2020 Open Reaction Database Project Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# To build the interface using the current state of ord-interface:
-# $ cd path/to/ord-interface/ord_interface
-# $ docker build --file=Dockerfile -t openreactiondatabase/ord-interface ..
-
-FROM python:3.10
-
-# default-jre is required for running the closure compiler linter.
-# For this next line, see:
-# https://github.com/geerlingguy/ansible-role-java/issues/64#issuecomment-597132394
-RUN mkdir -p /usr/share/man/man1/
-RUN apt-get update \
-   && apt-get install -y \
-   build-essential \
-   default-jre \
-   nginx \
-   npm \
-   git \
-   procps \
-   unzip \
-   && apt-get clean \
-   && rm -rf /var/lib/apt/lists/*
-
-# Fetch and build editor dependencies.
-# NOTE(kearnes): Do this before COPYing the local state so it can be cached.
-WORKDIR /app/cmccdb-interface/cmccdb_interface
-RUN wget https://github.com/epam/ketcher/releases/download/v2.5.1/ketcher-standalone-2.5.1.zip \
-   && unzip ketcher-standalone-2.5.1.zip
-# WORKDIR /app/ord-interface/ord_interface/editor
-# RUN wget https://github.com/google/closure-library/archive/v20200517.tar.gz \
-#    && tar -xzf v20200517.tar.gz \
-#    && rm v20200517.tar.gz
-# RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protobuf-js-3.14.0.tar.gz \
-#    && tar -xzf protobuf-js-3.14.0.tar.gz \
-#    && rm protobuf-js-3.14.0.tar.gz
-# RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v3.14.0/protoc-3.14.0-linux-x86_64.zip \
-#    && unzip protoc-3.14.0-linux-x86_64.zip
-# ENV PATH="/app/ord-interface/ord_interface/editor/bin:${PATH}"
-# RUN wget https://raw.githubusercontent.com/google/closure-compiler/master/contrib/externs/jquery-3.3.js \
-#    && mkdir -p externs \
-#    && mv jquery-3.3.js externs
-# RUN npm install google-closure-compiler@20220803
-WORKDIR /app
-
-# Install dependencies.
-WORKDIR /app/cmccdb-interface
-COPY cmccdb-interface/setup.py cmccdb-interface/README.md ./
-RUN pip install --upgrade pip \
-   && pip install gunicorn wheel 
-# https://stackoverflow.com/a/60511098.
-RUN python setup.py egg_info \
-   && pip install $(grep -v '^\[' *.egg-info/requires.txt) \
-   && rm -rf *.egg-info/
-
-# Copy the local state.
-# COPY ord_interface/editor/js/ ord_interface/editor/js/
-# COPY ord_interface/editor/build.sh ord_interface/editor
-# WORKDIR /app/ord-interface/ord_interface/editor
-# RUN ./build.sh
-WORKDIR /app
-COPY cmccdb-schema cmccdb-schema
-WORKDIR /app/cmccdb-interface
-# Build the Vue app.
-COPY cmccdb-interface/app/ app/
+# syntax=docker/dockerfile:1
+# Context is the directory containing cmccdb-interface and cmccdb-schema.
+FROM node:22-bookworm-slim AS frontend-deps
 WORKDIR /app/cmccdb-interface/app
-RUN cp -r /app/cmccdb-interface/cmccdb_interface/standalone/ /app/cmccdb-interface/app/src/ketcher \
-   && npm install \
-   && npm run build \
-   && mv dist/ /app/cmccdb-interface/vue
-WORKDIR /app/cmccdb-interface
-COPY cmccdb-interface/cmccdb_interface/about.html cmccdb_interface/
-COPY cmccdb-interface/cmccdb_interface/interface.py cmccdb_interface/
-COPY cmccdb-interface/cmccdb_interface/client/ cmccdb_interface/client/
-COPY cmccdb-interface/cmccdb_interface/visualization/ cmccdb_interface/visualization/
-RUN pip install .
+# Keep installation cached across Vue and Python source changes.
+COPY cmccdb-schema/js/cmccdb-schema/package.json /app/cmccdb-schema/js/cmccdb-schema/package.json
+COPY cmccdb-interface/app/package.json cmccdb-interface/app/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci --no-audit --no-fund \
+    && sha256sum package.json package-lock.json /app/cmccdb-schema/js/cmccdb-schema/package.json \
+    | sha256sum | cut -d ' ' -f 1 > node_modules/.cmccdb-dependencies.sha256
 
-# Build and launch the interface.
-COPY cmccdb-interface/cmccdb_interface/start_app.sh .
+FROM debian:bookworm-slim AS ketcher
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl unzip \
+    && rm -rf /var/lib/apt/lists/*
+ARG KETCHER_SHA256=38ba0411e5c7190eb9f0fcc8e5904de45ac99e02a3707781f342af6e0997a1f0
+RUN curl -fsSL --retry 3 https://github.com/epam/ketcher/releases/download/v2.5.1/ketcher-standalone-2.5.1.zip -o /ketcher.zip \
+    && test -n "${KETCHER_SHA256}" \
+    && echo "${KETCHER_SHA256}  /ketcher.zip" | sha256sum -c - \
+    && unzip -q /ketcher.zip -d /ketcher && rm /ketcher.zip
+
+FROM frontend-deps AS frontend
+COPY cmccdb-schema/js/cmccdb-schema/ /app/cmccdb-schema/js/cmccdb-schema/
+COPY cmccdb-interface/app/ ./
+COPY --from=ketcher /ketcher/standalone/ ./src/ketcher/
+RUN npm run build
+
+FROM python:3.11-slim-bookworm AS python-deps
+WORKDIR /app
+COPY cmccdb-interface/requirements-runtime.txt /app/requirements-runtime.txt
+RUN python -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --only-binary=rdkit,numpy,pandas,psycopg2-binary -r requirements-runtime.txt
+
+FROM python-deps AS python-code
+COPY cmccdb-schema/setup.py cmccdb-schema/pyproject.toml cmccdb-schema/README.md /app/cmccdb-schema/
+COPY cmccdb-schema/cmccdb_schema/ /app/cmccdb-schema/cmccdb_schema/
+COPY cmccdb-interface/setup.py cmccdb-interface/pyproject.toml cmccdb-interface/README.md /app/cmccdb-interface/
+# Copy the complete backend, including database/, util.py and endpoints.
+COPY cmccdb-interface/cmccdb_interface/ /app/cmccdb-interface/cmccdb_interface/
+RUN pip install --no-deps --no-build-isolation ./cmccdb-schema ./cmccdb-interface && pip check \
+    && python -c "from cmccdb_schema.proto import dataset_pb2, reaction_pb2, test_pb2; from rdkit import Chem; assert Chem.MolFromSmiles('CCO')"
+
+FROM python:3.11-slim-bookworm AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends nginx git libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH=/opt/venv/bin:$PATH \
+    PYTHONPATH=/app/cmccdb-interface:/app/cmccdb-schema \
+    PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY --from=python-code /opt/venv /opt/venv
+COPY --from=python-code /app/cmccdb-schema /app/cmccdb-schema
+COPY --from=python-code /app/cmccdb-interface /app/cmccdb-interface
+COPY --from=frontend /app/cmccdb-interface/app/dist/ /app/cmccdb-interface/vue/
+COPY --from=ketcher /ketcher/standalone/ /app/cmccdb-interface/cmccdb_interface/standalone/
 COPY cmccdb-interface/cmccdb_interface/nginx.conf /etc/nginx/nginx.conf
-
-ENV PYTHONPATH=/app/cmccdb-interface:/app/cmccdb-schema
-RUN ln -sf /dev/stderr /var/log/nginx.log \
-   && chmod +x start_app.sh
+COPY cmccdb-interface/cmccdb_interface/start_app.sh /app/cmccdb-interface/start_app.sh
+RUN ln -sf /dev/stderr /var/log/nginx.log && chmod +x /app/cmccdb-interface/start_app.sh
+WORKDIR /app/cmccdb-interface
+EXPOSE 80
 ENTRYPOINT ["/app/cmccdb-interface/start_app.sh"]
+
+# Optional preview retains Node and the development server dependencies.
+FROM runtime AS preview
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+COPY --from=frontend /app/cmccdb-schema/js/ /app/cmccdb-schema/js/
+COPY --from=frontend /app/cmccdb-interface/app/ /app/cmccdb-interface/dev/
+ENV CMCCDB_LAUNCH_DEV_INTERFACE=true \
+    CMCCDB_KETCHER_DIR=/app/cmccdb-interface/vue/ketcher
+EXPOSE 95
+
+# Make the small production image the default build target.
+FROM runtime AS production

@@ -44,11 +44,10 @@ if __name__ == "__main__":
             "flask>=1.1.2",
             "flask-talisman>=1.0.0",
             "jinja2>=2.0.0",
-            # "ord-schema==0.3.71",
+            "cmccdb-schema==0.3.80",
             "pandas>=1.0.4",
-            "protobuf==4.22.3",
+            "protobuf>=5.27.3,<6",
             "rdkit>=2021.9.5",
-            "psycopg2>=2.8.5",
             "pygithub>=1.51",
             "requests>=2.24.0",
             "inflection>=0.5.1",
@@ -56,9 +55,7 @@ if __name__ == "__main__":
             "numpy<2",
             "openpyxl>=3.0.5",
             "psycopg2-binary>=2.8.5",
-            "pygithub>=1.51",
             "python-dateutil>=1.10.0",
-            "rdkit>=2021.9.5",
             "sqlalchemy>=1.4.39"
         ]
         # extras_require={
