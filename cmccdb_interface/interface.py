@@ -30,6 +30,7 @@ from cmccdb_interface.visualization import filters
 
 # Set the ketcher distribution as the static folder.
 app = flask.Flask(__name__, static_folder="standalone", template_folder=".")
+app.config["MAX_CONTENT_LENGTH"] = 31 * 1024 * 1024
 # https://flask.palletsprojects.com/en/2.1.x/security/#security-headers
 # TODO(skearnes): Figure out how to use this.
 # flask_talisman.Talisman(app)

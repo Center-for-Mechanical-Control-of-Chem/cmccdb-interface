@@ -86,8 +86,10 @@ def configure_database(database_name=None, **conn_args):
     orm_db.prepare_database(engine)
 def get_session(database_name=None, **conn_args):
     engine = get_engine(database_name=database_name, **conn_args)
-    orm_db.prepare_database(engine)
-    return orm.Session(engine)
+    cartridge = orm_db.prepare_database(engine)
+    session = orm.Session(engine)
+    session.info['rdkit_cartridge'] = cartridge
+    return session
 
 def create_database(database_name=None, **conn_args):
     database_name = get_database_name(database_name)
@@ -145,6 +147,7 @@ def delete_dataset(dataset_id, database_name=None, **conn_args):
         session.commit()
 def add_dataset(data, database_name=None, **conn_args):
     with get_session(database_name=database_name, **conn_args) as session:
-        orm_db.add_dataset(data, session)
+        orm_db.add_dataset(data, session, rdkit_cartridge=session.info['rdkit_cartridge'])
         session.flush()
         session.commit()
+    return data.dataset_id

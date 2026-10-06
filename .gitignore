@@ -25,6 +25,7 @@ __pycache__
 # Node stuff.
 **/node_modules/
 **/package-lock.json
+!app/package-lock.json
 
 # React dependencies
 **/.pnp

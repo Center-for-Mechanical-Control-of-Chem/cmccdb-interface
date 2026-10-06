@@ -40,7 +40,7 @@ be URL-encoded.
 import os
 import flask
 import urllib
-from ..database import manage, datasets, backups, auxiliary
+from ..database import manage, datasets, backups
 
 from . import handlers, authentication
 
@@ -83,16 +83,15 @@ def upload_dataset():
             raise ValueError("only CMCC members can upload to primary, contribute to `staging` instead")
 
         uploader_info = get_uploader_info()
-        dataset_files = flask.request.files.getlist("uploadFile")
-        if len(dataset_files) != 1 or not dataset_files[0].filename:
-            raise ValueError("Choose exactly one dataset file before submitting")
-        file_name = dataset_files[0].filename
-        if os.path.splitext(file_name)[1].lower() not in {".xlsx", ".csv", ".pbtxt", ".pb"}:
-            raise ValueError("Dataset files must be .xlsx, .csv, .pbtxt or .pb")
-        body = auxiliary.read_upload(dataset_files[0])
-        uploads = auxiliary.collect_uploads([
-            file for key, file in flask.request.files.items(multi=True) if key != "uploadFile"
-        ])
+        file_name = flask.request.files['uploadFile'].filename
+        body = flask.request.files['uploadFile'].read(datasets.MAX_UPLOAD_BYTES + 1)
+        auxiliary_files = {}
+        for key, attachment in flask.request.files.items(multi=True):
+            if key == 'uploadFile':
+                continue
+            if attachment.filename in auxiliary_files:
+                raise ValueError('Auxiliary file names must be unique')
+            auxiliary_files[attachment.filename] = attachment.read(datasets.MAX_UPLOAD_BYTES + 1)
 
         perform_backup = flask.request.args.get("perform_backup")
         if (
@@ -106,17 +105,21 @@ def upload_dataset():
             else:
                 perform_backup = False
         if isinstance(perform_backup, str):
-            perform_backup = perform_backup.strip().lower() in {"1", "true", "yes"}
+            value = perform_backup.strip().lower()
+            if value not in {'0', '1', 'true', 'false', 'yes', 'no'}:
+                raise ValueError('perform_backup must be true or false')
+            perform_backup = value in {'1', 'true', 'yes'}
+        
         dataset = datasets.prep_and_create_pb_dataset(
             file_name,
             body,
             perform_backup=perform_backup,
             uploader_username=auth_info["username"],
             uploader_name=uploader_info["name"],
-            uploader_email=uploader_info["email"]
+            uploader_email=uploader_info["email"],
+            auxiliary_files=auxiliary_files
             )
-        with auxiliary.saved_uploads(dataset, uploads, perform_backup):
-            manage.add_dataset(dataset, database_name=database_name)
+        manage.add_dataset(dataset, database_name=database_name)
 
         if perform_backup:
             try:
@@ -128,6 +131,27 @@ def upload_dataset():
         return {'dataset_id':dataset.dataset_id}
     except Exception as error:  # pylint: disable=broad-except
         return flask.abort(handlers.make_error_response(error, 406))
+
+@bp.route('/api/auxiliary/<dataset_id>/<filename>', methods=['GET'])
+def download_auxiliary(dataset_id, filename):
+    from io import BytesIO
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from cmccdb_schema.orm.mappers import Mappers
+    from cmccdb_schema.proto import reaction_pb2
+    engine = manage.get_engine(database_name=flask.request.args.get('database'))
+    try:
+        with Session(engine) as session:
+            rows = session.execute(select(Mappers.Reaction.proto).join(Mappers.Dataset)
+                .where(Mappers.Dataset.dataset_id == dataset_id))
+            for (proto,) in rows:
+                reaction = reaction_pb2.Reaction.FromString(bytes(proto))
+                data = reaction.provenance.reaction_metadata.get('attachment:' + filename)
+                if data is not None and data.WhichOneof('kind') == 'bytes_value':
+                    return flask.send_file(BytesIO(data.bytes_value), as_attachment=True, download_name=filename)
+        flask.abort(404)
+    finally:
+        engine.dispose()
 
 @bp.route("/api/reconfigure", methods=["POST"])
 def reconfigure_database():

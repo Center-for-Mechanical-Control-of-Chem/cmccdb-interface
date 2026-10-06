@@ -425,7 +425,9 @@ class DatasetIdQuery(ReactionQueryBase):
                 f"""
             SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
             FROM {constants.SCHEMA_NAME}.reaction
-            JOIN dataset ON dataset.id = reaction.dataset_id
+            JOIN {constants.SCHEMA_NAME}.dataset ON (
+                dataset.id = reaction.dataset_id
+                OR reaction.reaction_id = ANY(dataset.reaction_ids))
             WHERE dataset.dataset_id = ANY (%s)"""
             )
         ]
