@@ -116,7 +116,18 @@ def upload_dataset():
             uploader_name=uploader_info["name"],
             uploader_email=uploader_info["email"]
             )
-        manage.add_dataset(dataset, database_name=database_name)
+        id = manage.add_dataset(dataset, database_name=database_name)
+
+        for k,f in flask.request.files.items():
+            if k != 'uploadFile':
+                body = f.read()
+                datasets.write_datafile(
+                    f.filename, body,
+                    perform_backup=perform_backup,
+                    username=uploader_info["name"],
+                    file_id=id,
+                    mode="w+b"
+                )
 
         if perform_backup:
             try:

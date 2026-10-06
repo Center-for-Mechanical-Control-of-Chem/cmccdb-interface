@@ -6,11 +6,14 @@ from . import backups
 from google.protobuf import text_format  # pytype: disable=import-error
 from cmccdb_schema.proto import dataset_pb2
 
-def write_datafile(file_name, data, perform_backup=True, backup_dir=None, username=None, mode='w+'):
+def write_datafile(file_name, data, perform_backup=True, backup_dir=None, username=None, mode='w+',
+                   file_id=None
+                   ):
     if file_name is None:
         file_name = "Untitled.pbtxt"
 
-    file_id = datetime.datetime.now().isoformat()
+    if file_id is None:
+        file_id = datetime.datetime.now().isoformat()
     file_name, ext = os.path.splitext(os.path.basename(file_name))
     file_name = f"{file_name}-{file_id}{ext}"
     
