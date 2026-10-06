@@ -35,7 +35,7 @@ export default {
 
 <template lang="pug">
 #main-container(
-  :class='noHeaderFooter ? "full-height" : ""'
+  :class='{ "full-height": noHeaderFooter, "reaction-page": $route.name === "reaction-view" }'
 )
   HeaderNav(v-if='!noHeaderFooter')
   router-view
@@ -56,6 +56,8 @@ body
   grid-template-rows: auto auto 1fr auto
   background-color: $bg-body
   min-width: 800px
+  &.reaction-page
+    min-width: 0
   &.full-height
     grid-template-rows: 1fr
 

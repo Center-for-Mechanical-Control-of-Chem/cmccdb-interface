@@ -27,6 +27,9 @@ import ProvenanceView from "./ProvenanceView"
 import EventsView from "./EventsView"
 import FloatingModal from "../../components/FloatingModal"
 import LoadingSpinner from '@/components/LoadingSpinner'
+import AuxiliaryData from '@/components/AuxiliaryData'
+import { availableConditions } from '@/utils/conditionDisplay'
+import { collectAuxiliaryData } from '@/utils/auxiliaryData'
 import hexToUint from "@/utils/hexToUint"
 import outcomesUtil from '@/utils/outcomes'
 
@@ -43,6 +46,7 @@ export default {
     EventsView,
     FloatingModal,
     LoadingSpinner,
+    AuxiliaryData,
   },
   data() {
     return {
@@ -57,16 +61,6 @@ export default {
         "automation",
       ],
       setupTab: "vessel",
-      conditionTabs: [
-        "temperature",
-        "pressure",
-        "stirring",
-        "illumination",
-        "electrochemistry",
-        "flow",
-        "mechanochemistry",
-        "other",
-      ],
       conditionTab: "mechanochemistry",
       workupsTab: 0,
       outcomesTab: 0,
@@ -103,14 +97,18 @@ export default {
       }
       return formattedDetails
     },
-    displayConditionsOther() {
-      const otherFields = [
-        "reflux",
-        "ph",
-        "conditions_are_dynamic",
-        "details",
-      ]
-      return otherFields.find(key => this.reaction.conditions[key])
+    availableConditionTabs() {
+      return availableConditions(this.reaction?.conditions)
+    },
+    selectedConditionTab() {
+      return this.availableConditionTabs.includes(this.conditionTab)
+        ? this.conditionTab : this.availableConditionTabs[0]
+    },
+    auxiliaryEntries() {
+      return collectAuxiliaryData(this.reaction)
+    },
+    databaseName() {
+      return new URLSearchParams(window.location.search).get("database") || ""
     },
     events() {
       const eventArray = []
@@ -203,9 +201,9 @@ export default {
     },
     setNavItems () {
       let items = ["summary", "identifiers", "inputs"]
-      const optionals = ["setup", "conditions", "notes", "observations", "workups"]
+      const optionals = ["setup", "conditions", "auxiliary-data", "notes", "observations", "workups"]
       optionals.forEach(item => {
-        if (this.reaction[item] || this.reaction[`${item}List`]?.length) items.push(item)
+        if (item === "auxiliary-data" ? this.auxiliaryEntries.length : this.reaction[item] || this.reaction[`${item}List`]?.length) items.push(item)
       })
       const lastItems = ["outcomes", "provenance", "full-record"]
       items.push(...lastItems)
@@ -305,20 +303,25 @@ export default {
         #conditions(v-if='reaction?.conditions')
           .title Conditions
           .section
-            .tabs
-              template(
-                v-for='tab in conditionTabs'
-              )
-                .tab.capitalize(
-                  @click='conditionTab = tab'
-                  :class='conditionTab === tab ? "selected" : ""'
-                  v-if='reaction.conditions[tab] || (tab === "other" && displayConditionsOther)'
-                ) {{tab}}
-            .details
+            .tabs.conditions-tabs(aria-label='Condition categories')
+              button.tab.capitalize(
+                v-for='tab in availableConditionTabs'
+                :key='tab'
+                type='button'
+                @click='conditionTab = tab'
+                :class='selectedConditionTab === tab ? "selected" : ""'
+                :aria-pressed='selectedConditionTab === tab'
+                aria-controls='conditions-panel'
+              ) {{tab}}
+            #conditions-panel.conditions-panel
               ConditionsView(
                 :conditions='reaction.conditions'
-                :display='conditionTab'
+                :display='selectedConditionTab'
               )
+        #auxiliary-data(v-if='auxiliaryEntries.length')
+          .title Auxiliary data
+          .section
+            AuxiliaryData(:reaction='reaction' :reaction-id='reactionId' :database='databaseName')
         #notes(v-if='reaction.notes')
           .title Notes
           .section
@@ -390,8 +393,11 @@ export default {
   .reaction-transition
     margin: 2rem 0
     display: grid
-    grid-template-columns: auto 1fr
+    grid-template-columns: auto minmax(0, 1fr)
     column-gap: 1rem
+  .content
+    min-width: 0
+    margin-right: 1rem
   .nav-holder
     height: 100%
     .nav
@@ -427,8 +433,8 @@ export default {
   font-size: 2rem
   margin-bottom: 0.5rem
 .section, .title
-  width: calc(85vw - 3rem)
-  min-width: calc(800px - 11rem) // (min main width) - (nav width plus gutters)
+  width: 100%
+  min-width: 0
   margin: 0
 .section
   background-color: white
@@ -436,6 +442,21 @@ export default {
   margin-bottom: 1rem
   padding: 1rem
   box-sizing: border-box
+  .conditions-tabs
+    margin-bottom: 1rem
+    .tab
+      font: inherit
+      background-color: white
+      color: $text-body
+      &.selected
+        background-color: $bg-primary
+        color: white
+      &:focus-visible
+        outline: 2px solid $bg-primary
+        outline-offset: 3px
+  .conditions-panel
+    width: 100%
+    min-width: 0
   .title
     font-size: 1.5rem
   &#summary
@@ -462,5 +483,29 @@ export default {
     width: fit-content
     color: white
     cursor: pointer
+
+@media (max-width: 800px)
+  .main-reaction-view
+    .reaction-transition
+      grid-template-columns: minmax(0, 1fr)
+      margin: 1rem
+    .nav-holder
+      margin-bottom: 1rem
+      .nav
+        display: flex
+        flex-wrap: wrap
+        position: static
+        margin-left: 0
+        min-width: 0
+        width: 100%
+        max-height: none
+        .nav-item
+          padding: 0.5rem 0.75rem
+    .content
+      min-width: 0
+      margin-right: 0
+    .section, .title
+      width: 100%
+      min-width: 0
 
 </style>

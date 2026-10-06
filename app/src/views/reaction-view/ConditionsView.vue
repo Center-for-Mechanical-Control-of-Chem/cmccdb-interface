@@ -15,149 +15,60 @@
 -->
 
 <script>
-import reaction_pb from "cmccdb-schema"
-import TreeDisplay from "@/components/TreeDisplay"
-import pbhelper from "@/utils/pbhelper"
-import conditionUtil from "@/utils/conditions"
+import { conditionRows } from "@/utils/conditionDisplay"
 
 export default {
-  components: {
-    TreeDisplay
-  },
-  props: {
-    conditions: Object,
-    display: String,
-  },
+  props: { conditions: Object, display: String },
   computed: {
-    tempType () {
-      return conditionUtil.tempType(this.conditions.temperature?.control.type)
-    },
-    tempSetPoint () {
-      return conditionUtil.tempSetPoint(this.conditions.temperature?.setpoint)
-    },
-    pressureType () {
-      return conditionUtil.pressureType(this.conditions.pressure?.control.type)
-    },
-    pressureSetPoint () {
-      return conditionUtil.pressureSetPoint(this.conditions.pressure?.setpoint)
-    },
-    pressureAtmo () {
-      return conditionUtil.pressureAtmo(this.conditions.pressure?.atmosphere)
-    },
-    stirType () {
-      return conditionUtil.stirType(this.conditions.stirring?.type)
-    },
-    stirRate () {
-      return conditionUtil.stirRate(this.conditions.stirring?.rate)
-    },
-    illumType () {
-      return conditionUtil.illumType(this.conditions.illumination)
-    },
-    mechanoChemType () {
-      return conditionUtil.mechanoChemType(this.conditions.mechanochemistry)
-    },
-    mechanoTypeList () {
-      return pbhelper.pbType(["Conditions", "Mechanochemistry"])
-    }
+    rows() { return conditionRows(this.conditions, this.display) },
   },
 }
 </script>
 
 <template lang="pug">
 .conditions-view
-  .temperature.details(v-if='display==="temperature"')
-    .label Control Type
-    .value {{tempType}}
-    template(v-if='conditions.temperature?.control.details')
-      .label Details
-      .value {{conditions.temperature?.control.details}}
-    .label Setpoint
-    .value {{tempSetPoint}}
-    // TODO Flesh out temp measurements
-    template(v-if='conditions.temperature?.measurementsList?.length')
-      .label Measurements
-      .value {{conditions.temperature.measurementsList}}
-    
-  .pressure.details(v-if='display==="pressure"')
-    .label Control Type
-    .value {{pressureType}}
-    template(v-if='conditions.pressure?.control.details')
-      .label Details
-      .value {{conditions.pressure?.control.details}}
-    .label Setpoint
-    .value {{pressureSetPoint}}
-    .label Atmosphere
-    .value {{pressureAtmo}}
-    // TODO Flesh out pressure measurements
-    template(v-if='conditions.pressure.measurementsList?.length')
-      .label Measurements
-      .value {{conditions.pressure.measurementsList}}
-
-  .stirring.details(v-if='display==="stirring"')
-    .label Type
-    .value {{stirType}}
-    template(v-if='conditions.stirring?.details')
-      .label Details
-      .value {{conditions.stirring?.details}}
-    .label Rate
-    .value {{stirRate || "UNSPECIFIED"}}
-    template(v-if='conditions.stirring?.rate?.rpm')
-      .label RPM
-      .value {{conditions.stirring?.rate?.rpm}}
-
-  .illumination.details(v-if='display==="illumination"')
-    .label Type
-    .value {{illumType}}
-    // TODO flesh out wave length
-    .label Peak Wavelength
-    .value {{conditions.illumination?.peakWaveLength || "None"}}
-    template(v-if='conditions.illumination?.color')
-      .label Color
-      .value {{conditions.illumination?.color}}
-    // TODO flesh out distance
-    .label Distance to Vessel
-    .value {{conditions.illumination?.distanceToVessel || "None"}}
-
-  // TODO flesh out electrochemistry
-  .electro.details(v-if='display === "electrochemistry"')
-    .label Type
-    .value {{conditions.electrochemistry}}
-  
-  // TODO flesh out flow
-  .electro.details(v-if='display === "flow"')
-    .label Type
-    .value {{conditions.flow}}
-
-    // TODO flesh out other
-  .mechano.details(v-if='display === "mechanochemistry"')
-    template(v-if='conditions.mechanochemistry')
-      TreeDisplay(
-        :value='conditions.mechanochemistry'
-        :type='"object"'
-        :types='mechanoTypeList'
-        )
-
-  // TODO flesh out other
-  .other.details(v-if='display === "other"')
-    template(v-if='conditions.reflux')
-      .label Reflux
-      .value {{conditions.reflux}}
-    template(v-if='conditions.ph')
-      .label pH
-      .value {{conditions.ph}}
-    template(v-if='conditions.conditions_are_dynamic')
-      .label Conditions are dynamic
-      .value {{conditions.conditions_are_dynamic}}
-    template(v-if='conditions.details')
-      .label Details
-      .value {{conditions.details}}
+  dl.condition-fields(v-if='rows.length')
+    .condition-row(v-for='(row, index) in rows' :key='index')
+      dt {{row.label}}
+      dd {{row.value}}
+  p.empty-state(v-else) No conditions recorded for this category.
 </template>
 
 <style lang="sass" scoped>
+@import '@/styles/vars'
 .conditions-view
-  .details
+  width: 100%
+  min-width: 0
+  .condition-fields
+    margin: 0
+    border: 1px solid $medgrey
+    border-radius: 0.5rem
+    overflow: hidden
+  .condition-row
     display: grid
-    grid-template-columns: auto 1fr
-    column-gap: 1rem
-    row-gap: 0.5rem
+    grid-template-columns: minmax(10rem, 32%) minmax(0, 1fr)
+    border-bottom: 1px solid $medgrey
+    &:last-child
+      border-bottom: none
+    dt, dd
+      margin: 0
+      padding: 0.75rem 1rem
+      overflow-wrap: anywhere
+      white-space: pre-wrap
+    dt
+      background-color: $lightgrey
+      font-weight: 700
+      color: $bg-primary
+    dd
+      line-height: 1.5
+  .empty-state
+    color: $darkgrey
+    margin: 1rem 0
+  @media (max-width: 600px)
+    .condition-row
+      grid-template-columns: minmax(0, 1fr)
+      dt
+        padding-bottom: 0.25rem
+      dd
+        padding-top: 0.25rem
 </style>

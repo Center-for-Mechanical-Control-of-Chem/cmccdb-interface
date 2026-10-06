@@ -41,6 +41,7 @@ def prep_pbtxt_file(
     uploader_email=None
     ):
     base_name, ext = os.path.splitext(os.path.basename(file_name))
+    ext = ext.lower()
     serialized = ext == ".pb"
     
     proper_file = write_datafile(
@@ -66,7 +67,7 @@ def prep_pbtxt_file(
 def create_pb_dataset(file, serialized=False):
     if serialized:
         with open(file, 'rb') as stream:
-            data = steam.read()
+            data = stream.read()
         dataset = dataset_pb2.Dataset.FromString(data)
     else:
         with open(file, 'r') as stream:

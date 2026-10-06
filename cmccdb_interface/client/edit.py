@@ -40,7 +40,7 @@ be URL-encoded.
 import os
 import flask
 import urllib
-from ..database import manage, datasets, backups
+from ..database import manage, datasets, backups, auxiliary
 
 from . import handlers, authentication
 
@@ -83,8 +83,16 @@ def upload_dataset():
             raise ValueError("only CMCC members can upload to primary, contribute to `staging` instead")
 
         uploader_info = get_uploader_info()
-        file_name = flask.request.files['uploadFile'].filename
-        body = flask.request.files['uploadFile'].read()
+        dataset_files = flask.request.files.getlist("uploadFile")
+        if len(dataset_files) != 1 or not dataset_files[0].filename:
+            raise ValueError("Choose exactly one dataset file before submitting")
+        file_name = dataset_files[0].filename
+        if os.path.splitext(file_name)[1].lower() not in {".xlsx", ".csv", ".pbtxt", ".pb"}:
+            raise ValueError("Dataset files must be .xlsx, .csv, .pbtxt or .pb")
+        body = auxiliary.read_upload(dataset_files[0])
+        uploads = auxiliary.collect_uploads([
+            file for key, file in flask.request.files.items(multi=True) if key != "uploadFile"
+        ])
 
         perform_backup = flask.request.args.get("perform_backup")
         if (
@@ -98,16 +106,7 @@ def upload_dataset():
             else:
                 perform_backup = False
         if isinstance(perform_backup, str):
-            perform_backup = (
-                perform_backup != "0" 
-                and perform_backup == "false"
-            )
-        
-        print({
-            "auth":auth_info,
-            "user":uploader_info,
-            "backup":perform_backup,
-        })
+            perform_backup = perform_backup.strip().lower() in {"1", "true", "yes"}
         dataset = datasets.prep_and_create_pb_dataset(
             file_name,
             body,
@@ -116,18 +115,8 @@ def upload_dataset():
             uploader_name=uploader_info["name"],
             uploader_email=uploader_info["email"]
             )
-        id = manage.add_dataset(dataset, database_name=database_name)
-
-        for k,f in flask.request.files.items():
-            if k != 'uploadFile':
-                body = f.read()
-                datasets.write_datafile(
-                    f.filename, body,
-                    perform_backup=perform_backup,
-                    username=uploader_info["name"],
-                    file_id=id,
-                    mode="w+b"
-                )
+        with auxiliary.saved_uploads(dataset, uploads, perform_backup):
+            manage.add_dataset(dataset, database_name=database_name)
 
         if perform_backup:
             try:
