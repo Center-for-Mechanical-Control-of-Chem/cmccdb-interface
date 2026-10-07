@@ -42,7 +42,9 @@ RUN pip install --no-deps --no-build-isolation ./cmccdb-schema ./cmccdb-interfac
     && python -c "from cmccdb_schema.proto import dataset_pb2, reaction_pb2, test_pb2; from rdkit import Chem; assert Chem.MolFromSmiles('CCO')"
 
 FROM python:3.11-slim-bookworm AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends nginx git libstdc++6 \
+# The RDKit wheel's Cairo/fontconfig libraries require these system libraries.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nginx git libstdc++6 libxrender1 libxext6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONPATH=/app/cmccdb-interface:/app/cmccdb-schema \
@@ -55,6 +57,8 @@ COPY --from=ketcher /ketcher/standalone/ /app/cmccdb-interface/cmccdb_interface/
 COPY cmccdb-interface/cmccdb_interface/nginx.conf /etc/nginx/nginx.conf
 COPY cmccdb-interface/cmccdb_interface/start_app.sh /app/cmccdb-interface/start_app.sh
 RUN ln -sf /dev/stderr /var/log/nginx.log && chmod +x /app/cmccdb-interface/start_app.sh
+# Check drawing in the final runtime, where system libraries must be present.
+RUN python -c "import base64; from rdkit import Chem; from cmccdb_interface.visualization import drawing; molecule = Chem.MolFromSmiles('CCO'); assert molecule is not None; svg = drawing.mol_to_svg(molecule); assert svg is not None and '<svg' in svg; png = base64.b64decode(drawing.mol_to_png(molecule)); assert png.startswith(bytes((137, 80, 78, 71, 13, 10, 26, 10))); print('RDKit SVG and PNG rendering: OK')"
 WORKDIR /app/cmccdb-interface
 EXPOSE 80
 ENTRYPOINT ["/app/cmccdb-interface/start_app.sh"]
