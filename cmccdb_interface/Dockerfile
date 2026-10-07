@@ -70,6 +70,8 @@ COPY --from=frontend /app/cmccdb-schema/js/ /app/cmccdb-schema/js/
 COPY --from=frontend /app/cmccdb-interface/app/ /app/cmccdb-interface/dev/
 ENV CMCCDB_LAUNCH_DEV_INTERFACE=true \
     CMCCDB_KETCHER_DIR=/app/cmccdb-interface/vue/ketcher
+# start_app.sh's CMCCDB_DEV_FRONTEND and CMCCDB_DEV_BACKEND (docker-compose-dev.yml) work in this image
+LABEL org.cmccdb.dev-support="frontend backend"
 EXPOSE 95
 
 # Make the small production image the default build target.

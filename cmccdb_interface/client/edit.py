@@ -202,9 +202,20 @@ def rebuild_proto(dataset_id):
         return flask.abort(handlers.make_error_response(error, 406))
 
 ENDPOINT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "endpoints")
+
+
+def dev_endpoints_enabled():
+    """The /api/dev endpoints (client/endpoints/*.py, reloaded at each call) run only where
+    CMCCDB_DEV_ENDPOINTS=true: a development instance (start_app.sh turns them on with CMCCDB_DEV_BACKEND)."""
+    return os.environ.get("CMCCDB_DEV_ENDPOINTS", "false").strip().lower() in ("true", "1", "yes", "on")
+
+
 @bp.route("/api/dev/<endpoint>/<name>", methods=["GET", "POST"])
 def test_endpoint(endpoint, name):
     import importlib, os, sys
+
+    if not dev_endpoints_enabled():
+        return flask.abort(404)
 
     if ENDPOINT_FOLDER not in sys.path:
         sys.path.insert(0, ENDPOINT_FOLDER)

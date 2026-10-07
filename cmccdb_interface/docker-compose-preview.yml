@@ -37,6 +37,8 @@ services:
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY}
       - CMCCDB_LAUNCH_DEV_INTERFACE=true
+      # the /api/dev endpoints are off unless asked for (docker-compose-dev.yml turns them on with its back end)
+      - CMCCDB_DEV_ENDPOINTS=true
     image: "${CMCCDB_PREVIEW_IMAGE:-cmccdb/interface-preview:2025.09.3}"
     pull_policy: never
     build:

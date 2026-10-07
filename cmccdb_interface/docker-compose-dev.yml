@@ -1,0 +1,89 @@
+# A development instance: its own database, and the interface with development support you turn on per run.
+#
+#   CMCCDB_DEV_FRONTEND=true  the Vue development server (hot reload) from your app/, on port 80 in place of the
+#                             built front end (CMCCDB_DEV_WEB_PORT) and on its own port (CMCCDB_DEV_FRONTEND_PORT)
+#   CMCCDB_DEV_BACKEND=true   the Python code of your cmccdb-interface and cmccdb-schema copies, reloaded when it
+#                             changes, with the /api/dev endpoints on
+# Both off: the image's own code and built front end, as in production (but with this instance's database).
+#
+# Your copies (cmccdb-interface/, cmccdb-schema/ and cmccdb-data/ in CMCCDB_DEV_SOURCE, by default the directory
+# above this repository) are mounted either way; the switches decide whether they are used. Start it with
+# ../restart_dev.sh [--frontend] [--backend] [--build], or e.g.
+#   CMCCDB_DEV_BACKEND=true podman compose -f docker-compose-dev.yml up -d
+# The front end's packages are installed in a volume of their own (npm ci when package.json changes), never in
+# your app/.
+#
+# Settings (environment, or a .env file next to this one):
+#   CMCCDB_DEV_SOURCE          where the copies are (default ../.., relative to this file)
+#   CMCCDB_DEV_DATABASE        the database's directory, or a volume name (default the volume cmccdb-dev-database)
+#   CMCCDB_DEV_CREDENTIALS     the credentials directory: github_auth_credentials.json, cmccdb_session_key.json
+#                              (default /home/cmccdb-credentials)
+#   CMCCDB_DEV_WEB_PORT, CMCCDB_DEV_FRONTEND_PORT, CMCCDB_DEV_DATABASE_PORT
+#                              ports on 127.0.0.1 (default 92, 93, 5436)
+#   CMCCDB_DEV_IMAGE, CMCCDB_DEV_DATABASE_IMAGE
+#                              the images (the interface's is built from the Dockerfile's `preview` target)
+# The deployment's ssh keys are not mounted: a development instance can't push backups.
+
+# a project of its own, so starting or stopping it never touches production's or the preview's containers
+name: cmccdb-dev
+
+services:
+  database_dev:
+    image: "${CMCCDB_DEV_DATABASE_IMAGE:-mcs07/postgres-rdkit:latest}"
+    command: [ "postgres", "-c", "log_statement=all" ]
+    ports:
+      # for queries from the host while you work; not reachable from other machines
+      - "127.0.0.1:${CMCCDB_DEV_DATABASE_PORT:-5436}:5432"
+    environment:
+      - PGDATA=/data
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PORT=5432
+    security_opt:
+      - label=disable
+    volumes:
+      - "${CMCCDB_DEV_DATABASE:-cmccdb-dev-database}:/data"
+  web_dev:
+    depends_on:
+      - database_dev
+    environment:
+      - POSTGRES_DATABASE=cmcc
+      - POSTGRES_HOST=database_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PORT=5432
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY:-}
+      - CMCCDB_DEV_FRONTEND=${CMCCDB_DEV_FRONTEND:-false}
+      - CMCCDB_DEV_FRONTEND_PROXY=${CMCCDB_DEV_FRONTEND:-false}
+      - CMCCDB_DEV_BACKEND=${CMCCDB_DEV_BACKEND:-false}
+      - CMCCDB_DEV_SOURCE_DIR=/app/dev-src
+    image: "${CMCCDB_DEV_IMAGE:-cmccdb/interface-dev:latest}"
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: cmccdb-interface/cmccdb_interface/Dockerfile
+      target: preview
+    ports:
+      - "127.0.0.1:${CMCCDB_DEV_WEB_PORT:-92}:80"
+      - "127.0.0.1:${CMCCDB_DEV_FRONTEND_PORT:-93}:95"
+    # SELinux labels are off for this container rather than relabelling your copies (:z), which may be on NFS
+    security_opt:
+      - label=disable
+    volumes:
+      - "${CMCCDB_DEV_CREDENTIALS:-/home/cmccdb-credentials}:/app/credentials:ro"
+      - cmccdb-dev-tmp:/app/tmp
+      - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-data:/app/cmccdb-data"
+      # back end (CMCCDB_DEV_BACKEND)
+      - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-interface/cmccdb_interface:/app/dev-src/cmccdb-interface/cmccdb_interface"
+      - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-schema/cmccdb_schema:/app/dev-src/cmccdb-schema/cmccdb_schema"
+      # front end (CMCCDB_DEV_FRONTEND)
+      - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-interface/app:/app/cmccdb-interface/dev"
+      - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-schema/js/cmccdb-schema:/app/cmccdb-schema/js/cmccdb-schema"
+      - cmccdb-dev-node-modules:/app/cmccdb-interface/dev/node_modules
+      - cmccdb-dev-npm-cache:/root/.npm
+volumes:
+  cmccdb-dev-database:
+  cmccdb-dev-tmp:
+  cmccdb-dev-node-modules:
+  cmccdb-dev-npm-cache:

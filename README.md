@@ -76,6 +76,30 @@ curl -X POST http://mechanochemistry-db-01.chem.tamu.edu/api/reconfigure
 
 This endpoint will be changed upon public release to simply create the database.
 
+## Development instance
+
+`cmccdb_interface/docker-compose-dev.yml` runs a development instance next to production and preview: its own
+database (a volume, or `CMCCDB_DEV_DATABASE`), and the interface built from the Dockerfile's `preview` target, on
+127.0.0.1 only. Development support is switched on per run:
+
+```commandline
+./restart_dev.sh --build                 # build the image, then run the image's own code and front end
+./restart_dev.sh --backend               # your cmccdb-interface and cmccdb-schema Python code, reloaded on change
+./restart_dev.sh --frontend --backend    # and the Vue development server, with hot reload
+./restart_dev.sh --down
+```
+
+- **Back end** (`CMCCDB_DEV_BACKEND=true`): gunicorn runs the copies mounted at `/app/dev-src` (by default the
+  `cmccdb-interface/` and `cmccdb-schema/` checkouts beside this one, `CMCCDB_DEV_SOURCE`) and reloads when a file
+  changes, and the `/api/dev/<module>/<function>` endpoints (`cmccdb_interface/client/endpoints/*.py`, reloaded at
+  each call) are on. Elsewhere those endpoints are off unless `CMCCDB_DEV_ENDPOINTS=true` (the preview sets it).
+- **Front end** (`CMCCDB_DEV_FRONTEND=true`): `npm run serve` from your `app/` (its packages in a volume of their
+  own; `npm ci` when `package.json` changes), served on the web port (92) in place of the built front end, and on
+  port 93. Edits show up in the browser without a rebuild.
+
+Ports, paths and images are set with the variables listed at the top of the compose file. The deployment's ssh keys
+are not mounted, so a development instance can't push backups.
+
 ## Front-End
 
 This is how the app interface is structured
