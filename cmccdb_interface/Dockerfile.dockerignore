@@ -28,3 +28,9 @@
 **/dist
 cmccdb-interface/app/src/ketcher
 cmccdb-interface/cmccdb_interface/standalone
+
+# Generated uploads, database snapshots and downloaded tools stay outside images.
+cmccdb-interface/cmccdb_interface/client/endpoints/test_inputs
+cmccdb-interface/cmccdb_interface/.snapshots
+cmccdb-interface/cmccdb_interface/.pg-tools
+cmccdb-interface/cmccdb_interface/archives

@@ -19,6 +19,7 @@
 
 export default {
   data: () => ({
+    isDevelopment: process.env.NODE_ENV === "development",
     database: "cmcc", 
     user: {
         name: null,
@@ -81,7 +82,8 @@ export default {
 
 <template lang="pug">
 div.alt-preview(:class="{ 'alt-visible' : inPreview() }") PREVIEW INTERFACE
-nav.navbar.navbar-expand-lg.bg-light
+div.dev-preview(v-if="isDevelopment") Development preview · live source
+nav.navbar.navbar-expand-lg.bg-light(:class="{ 'dev-navigation': isDevelopment }")
   .container
     a.navbar-brand(href="/")
       img(
@@ -153,6 +155,17 @@ nav
             color: $bg-primary
             &:hover
               color: $bg-secondary
+.dev-preview
+  background: #0f766e
+  color: #ffffff
+  text-align: center
+  font-size: .875rem
+  font-weight: 700
+  letter-spacing: .04em
+  padding: .45rem 1rem
+nav.dev-navigation
+  border-bottom: 3px solid #14b8a6
+  box-shadow: 0 3px 12px rgba(15, 118, 110, .12)
 .db-label
   color:$text-accent
 .gh-user-info

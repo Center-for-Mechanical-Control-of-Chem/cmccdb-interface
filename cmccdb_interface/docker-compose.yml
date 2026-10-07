@@ -44,6 +44,7 @@ services:
       target: production
     ports:
       - "85:80"
+      - "91:95"
     volumes:
       - /home/cmccdb-credentials:/app/credentials:z
       - /home/cmccdb-ssh-config:/root/.ssh/:z

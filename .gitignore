@@ -47,3 +47,11 @@ __pycache__
 
 # VSCode.
 .vscode/
+
+# Generated development uploads and runtime state (retain local files).
+/cmccdb_interface/client/endpoints/test_inputs/
+/cmccdb_interface/.snapshots/
+/cmccdb_interface/.pg-tools/
+# Database/container/source archives belong in local backup storage.
+/archives/
+/cmccdb_interface/archives/
