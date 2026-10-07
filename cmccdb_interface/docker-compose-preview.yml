@@ -39,6 +39,8 @@ services:
       - CMCCDB_LAUNCH_DEV_INTERFACE=true
       # the /api/dev endpoints are off unless asked for (docker-compose-dev.yml turns them on with its back end)
       - CMCCDB_DEV_ENDPOINTS=true
+      - CMCCDB_MAINTENANCE_API=${CMCCDB_MAINTENANCE_API:-false}
+      - CMCCDB_SNAPSHOT_DIR=/app/backups
     image: "${CMCCDB_PREVIEW_IMAGE:-cmccdb/interface-preview:2025.09.3}"
     pull_policy: never
     build:
@@ -53,6 +55,7 @@ services:
       - /home/cmccdb-ssh-config:/root/.ssh/:z
       - /home/cmccdb-tmp:/app/tmp:z
       - /home/cmccdb-data:/app/cmccdb-data:z
+      - cmccdb-preview-backups:/app/backups
       - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
       - /home/cmccdb-schema/js/cmccdb-schema:/app/cmccdb-schema/js/cmccdb-schema:z
       - /home/cmccdb-interface/app:/app/cmccdb-interface/dev:z
@@ -60,5 +63,6 @@ services:
       - preview-npm-cache:/root/.npm
       - /home/cmccdb-interface/cmccdb_interface:/app/cmccdb-interface/cmccdb_interface:z
 volumes:
+  cmccdb-preview-backups:
   preview-node-modules:
   preview-npm-cache:

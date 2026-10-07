@@ -19,16 +19,23 @@ import LoadingSpinner from '@/components/LoadingSpinner'
 import Enumerate from "./EnumerateView"
 import Upload from "./UploadView"
 import Datasets from "./DatasetsView"
+import DevContributionSuite from "@/components/DevContributionSuite"
+import DevMaintenanceSuite from "@/components/DevMaintenanceSuite"
+import DevIncompleteSuite from "@/components/DevIncompleteSuite"
 
 export default {
   components: {
     LoadingSpinner,
     Enumerate,
     Upload,
-    Datasets
+    Datasets,
+    DevContributionSuite,
+    DevMaintenanceSuite,
+    DevIncompleteSuite
   },
   data() {
     return {
+      isDevelopment: process.env.NODE_ENV === "development",
       loading: true,
       tabs: [
         "Introduction",
@@ -81,6 +88,9 @@ export default {
                 | &nbsp; script in the main repository.
         transition(name="fade")
           Upload(v-if='activeTab == "Upload"')
+        DevContributionSuite(v-if="isDevelopment")
+        DevMaintenanceSuite(v-if="isDevelopment")
+        DevIncompleteSuite(v-if="isDevelopment")
 
 </template>
 

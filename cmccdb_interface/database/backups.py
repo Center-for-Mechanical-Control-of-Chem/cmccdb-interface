@@ -58,7 +58,16 @@ def git_info():
         'remote': run_git("remote get-url origin")
     }
 
+def github_backups_enabled():
+    """Development source and frontend modes never publish data backups."""
+    return not any(
+        os.environ.get(key, "false").strip().lower() in {"1", "true", "yes", "on"}
+        for key in ("CMCCDB_DEV_BACKEND", "CMCCDB_DEV_FRONTEND", "CMCCDB_DISABLE_GITHUB_BACKUPS")
+    )
+
 def git_backup():
+    if not github_backups_enabled():
+        return {"skipped": True, "reason": "GitHub backups disabled in development"}
     try:
         enable_git()
     except OSError:

@@ -34,6 +34,8 @@ services:
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY}
+      - CMCCDB_MAINTENANCE_API=${CMCCDB_MAINTENANCE_API:-false}
+      - CMCCDB_SNAPSHOT_DIR=/app/backups
     image: "${CMCCDB_INTERFACE_IMAGE:-cmccdb/interface:2025.09.3}"
     pull_policy: never
     build:
@@ -47,3 +49,6 @@ services:
       - /home/cmccdb-ssh-config:/root/.ssh/:z
       - /home/cmccdb-tmp:/app/tmp:z
       - /home/cmccdb-data:/app/cmccdb-data:z
+      - cmccdb-backups:/app/backups
+volumes:
+  cmccdb-backups:

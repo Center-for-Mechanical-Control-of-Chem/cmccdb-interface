@@ -757,16 +757,21 @@ class DoiQuery(ReactionQueryBase):
 class TreatmentQuery(ReactionQueryBase):
     """Looks up reactions by Mechanochemical treatment."""
 
-    valid_treatments = ["TWIN_SCREW", "HAND_GRIND", "TIP_ARRAY", "BALL_MILL"]
+    valid_treatments = list(reaction_pb2.MechanochemistryConditions.MechanochemistryType.keys())
 
-    def __init__(self, treatments: List[str], liquid_assisted:bool=False) -> None:
+    def __init__(self, treatments: List[str], liquid_assisted:Optional[bool]=None) -> None:
         """Initializes the query.
 
         Args:
             dois: List of DOIs.
         """
-        self._treatments = treatments
-        self._liquid_assisted = bool(liquid_assisted)
+        self._treatments = [value.strip().upper() for value in treatments]
+        if isinstance(liquid_assisted, str):
+            value = liquid_assisted.strip().lower()
+            if value not in {'true', 'false', '1', '0', 'yes', 'no'}:
+                raise QueryException('liquid_assisted must be true or false')
+            liquid_assisted = value in {'true', '1', 'yes'}
+        self._liquid_assisted = liquid_assisted
 
     def json(self) -> str:
         """Returns a JSON representation of the query."""
@@ -785,7 +790,7 @@ class TreatmentQuery(ReactionQueryBase):
         valid_treatments = set(self.valid_treatments)
         for i, treatment in enumerate(self._treatments):
             if treatment not in valid_treatments:
-                raise QueryException(f"invalid treatment type: {treatment}") from error
+                raise QueryException(f"invalid treatment type: {treatment}")
             # if doi != parsed:
             #     # Trim the DOI as needed to match the database contents.
             #     logger.info(f"Updating DOI: {doi} -> {parsed}")
@@ -818,6 +823,9 @@ class TreatmentQuery(ReactionQueryBase):
             )
         ]
         args = [self._treatments]
+        if self._liquid_assisted is not None:
+            components.append(sql.SQL(" AND mechanochemistry_conditions.liquid_assisted IS NOT DISTINCT FROM %s"))
+            args.append(self._liquid_assisted)
         if limit:
             components.append(sql.SQL(" LIMIT %s"))
             args.append(limit)

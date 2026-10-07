@@ -42,9 +42,16 @@ RUN pip install --no-deps --no-build-isolation ./cmccdb-schema ./cmccdb-interfac
     && python -c "from cmccdb_schema.proto import dataset_pb2, reaction_pb2, test_pb2; from rdkit import Chem; assert Chem.MolFromSmiles('CCO')"
 
 FROM python:3.11-slim-bookworm AS runtime
+ARG PG_CLIENT_MAJOR=16
 # The RDKit wheel's Cairo/fontconfig libraries require these system libraries.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    nginx git libstdc++6 libxrender1 libxext6 libexpat1 \
+    nginx git ca-certificates curl libstdc++6 libxrender1 libxext6 libexpat1 \
+    && mkdir -p /usr/share/postgresql-common/pgdg \
+    && curl -fsSL --retry 3 https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-${PG_CLIENT_MAJOR} \
     && rm -rf /var/lib/apt/lists/*
 ENV PATH=/opt/venv/bin:$PATH \
     PYTHONPATH=/app/cmccdb-interface:/app/cmccdb-schema \

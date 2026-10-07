@@ -86,8 +86,16 @@ def configure_database(database_name=None, **conn_args):
     orm_db.prepare_database(engine)
 def get_session(database_name=None, **conn_args):
     engine = get_engine(database_name=database_name, **conn_args)
-    cartridge = orm_db.prepare_database(engine)
     session = orm.Session(engine)
+    from cmccdb_schema.orm.schema_updates import LOCK_ID, MigrationRequired
+    try:
+        if not session.scalar(sqlalchemy.text('SELECT pg_try_advisory_xact_lock_shared(:id)'), {'id': LOCK_ID}):
+            raise MigrationRequired('Database migration is running; retry after it completes')
+        cartridge = orm_db.prepare_database(engine)
+    except Exception:
+        session.close()
+        engine.dispose()
+        raise
     session.info['rdkit_cartridge'] = cartridge
     return session
 

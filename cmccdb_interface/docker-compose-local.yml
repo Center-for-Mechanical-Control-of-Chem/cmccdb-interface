@@ -31,12 +31,16 @@ services:
       CMCCDB_SESSION_KEY: ${CMCCDB_SESSION_KEY:?Set CMCCDB_SESSION_KEY}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      CMCCDB_MAINTENANCE_API: ${CMCCDB_MAINTENANCE_API:-false}
+      CMCCDB_SNAPSHOT_DIR: /app/backups
     ports:
       - "${CMCCDB_WEB_PORT:-8080}:80"
     volumes:
       - cmccdb-tmp:/app/tmp
       - cmccdb-data:/app/cmccdb-data
+      - cmccdb-backups:/app/backups
 volumes:
   cmccdb-postgres16:
   cmccdb-tmp:
   cmccdb-data:
+  cmccdb-backups:

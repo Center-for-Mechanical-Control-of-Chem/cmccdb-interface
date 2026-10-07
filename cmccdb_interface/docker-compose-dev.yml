@@ -58,6 +58,7 @@ services:
       - CMCCDB_DEV_FRONTEND_PROXY=${CMCCDB_DEV_FRONTEND:-false}
       - CMCCDB_DEV_BACKEND=${CMCCDB_DEV_BACKEND:-false}
       - CMCCDB_DEV_SOURCE_DIR=/app/dev-src
+      - CMCCDB_SNAPSHOT_DIR=/app/backups
     image: "${CMCCDB_DEV_IMAGE:-cmccdb/interface-dev:latest}"
     pull_policy: never
     build:
@@ -73,6 +74,7 @@ services:
     volumes:
       - "${CMCCDB_DEV_CREDENTIALS:-/home/cmccdb-credentials}:/app/credentials:ro"
       - cmccdb-dev-tmp:/app/tmp
+      - cmccdb-dev-backups:/app/backups
       - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-data:/app/cmccdb-data"
       # back end (CMCCDB_DEV_BACKEND)
       - "${CMCCDB_DEV_SOURCE:-../..}/cmccdb-interface/cmccdb_interface:/app/dev-src/cmccdb-interface/cmccdb_interface"
@@ -85,5 +87,6 @@ services:
 volumes:
   cmccdb-dev-database:
   cmccdb-dev-tmp:
+  cmccdb-dev-backups:
   cmccdb-dev-node-modules:
   cmccdb-dev-npm-cache:

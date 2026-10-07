@@ -72,7 +72,7 @@ STAGING_DATABASE = "staging"
 HOST_PATH = "mechanochemistry.chem.tamu.edu"
 @bp.route("/api/upload", methods=["POST"])
 def upload_dataset():
-    """Writes the request body to the datasets table without validation."""
+    """Parses and validates an authenticated contribution before storing it."""
 
     database_name = flask.request.args.get("database")
     try:
@@ -110,6 +110,9 @@ def upload_dataset():
                 raise ValueError('perform_backup must be true or false')
             perform_backup = value in {'1', 'true', 'yes'}
         
+        # Enforce the development policy even if a request explicitly asks for a backup.
+        perform_backup = bool(perform_backup) and backups.github_backups_enabled()
+
         dataset = datasets.prep_and_create_pb_dataset(
             file_name,
             body,

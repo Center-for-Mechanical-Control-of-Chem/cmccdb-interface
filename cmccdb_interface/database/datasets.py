@@ -153,6 +153,9 @@ def prep_and_create_pb_dataset(
         )
     dataset = create_pb_dataset(file, serialized=serialized)
     attach_auxiliary_files(dataset, auxiliary_files)
+    # Precompiled formats must receive the same validation as Excel uploads.
+    from cmccdb_schema import validations
+    validations.validate_datasets({str(file): dataset})
     if auxiliary_files:
         stem, _ = split_dataset_filename(file)
         message_helpers.write_message(dataset, os.path.join(os.path.dirname(file), stem + '.pbtxt'))
