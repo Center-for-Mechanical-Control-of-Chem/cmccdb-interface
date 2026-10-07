@@ -1,6 +1,6 @@
 # import requirements
-from ord_schema.message_helpers import load_message, write_message
-from ord_schema.proto import dataset_pb2
+from cmccdb_schema.message_helpers import load_message, write_message
+from cmccdb_schema.proto import dataset_pb2
 
 # load the binary ord file
 dataset = load_message("Indole_synthesis.pbtxt", dataset_pb2.Dataset)
