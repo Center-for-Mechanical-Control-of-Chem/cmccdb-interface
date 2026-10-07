@@ -55,9 +55,12 @@ class FakeEngine:
                 info=tarfile.TarInfo('cmccdb-schema/file.txt');info.size=3;z.addfile(info,io.BytesIO(b'old'))
             body=buffer.getvalue()
         elif data:
-            action=next(a for a in ['probe','backup','rehearse','apply','http'] if a in args)
+            action=next(a for a in ['probe','backup','rehearse','apply','http',
+                'initial_prepare','legacy_backup','replay','coverage','promote'] if a in args)
             if self.failure==action:raise release.UpdateError('Injected '+action+' failure')
             result={'required':False,'compatible':True,'snapshot_id':None}
+            if action in {'initial_prepare','replay','coverage'}:result={'ok':True}
+            if action=='promote':result={'promoted':True,'retained_databases':{'cmcc':'retained-cmcc','staging':'retained-staging'}}
             if action=='backup':result={'id':'00000000-0000-0000-0000-000000000001' if args[-1]=='cmcc' else '00000000-0000-0000-0000-000000000002',
                 'database':args[-1],'verified':True,'restore_verification':{'verified':True,'database':'cmccdb_restore_'+args[-1]}}
             body=('CMCCDB_RELEASE_RESULT='+json.dumps(result)+'\n').encode()
@@ -245,3 +248,68 @@ def test_git_source_archive_rejects_symlinks(tmp_path):
         '-c','user.email=cmccdb-test@example.invalid','-c','commit.gpgsign=false',
         'commit','--quiet','-m','Symlink fixture'])
     with pytest.raises(release.UpdateError,match='unsafe path or link'):update.snapshot_source()
+
+
+def replay_fixture(tmp_path,target='main',failure=None):
+    update,fake=fixture(tmp_path,target=target,failure=failure)
+    for database in ['cmcc','staging']:
+        folder=tmp_path/'incoming'/database;folder.mkdir(parents=True)
+        (folder/'contribution.xlsx').write_bytes(b'placeholder for orchestration')
+        setattr(update.args,'resubmit_folder' if database=='cmcc' else 'staging_resubmit_folder',folder)
+    update.args.uploader_name='Migration Test';update.args.uploader_email='migration@example.invalid'
+    update.replay_mode=True
+    return update,fake
+
+
+@pytest.mark.parametrize('target',['main','preview'])
+def test_initial_replay_does_not_need_old_backend_helpers(tmp_path,target):
+    update,fake=replay_fixture(tmp_path,target=target,failure='probe')
+    result=update.execute()
+    assert result['phase']=='complete' and result['migration_mode']=='xlsx_replay'
+    assert not any('probe' in c or 'apply' in c for c in fake.calls)
+    assert sum('replay' in c for c in fake.calls)==2
+    stop=next(i for i,c in enumerate(fake.calls) if c[1]=='stop')
+    assert sum('replay' in c for c in fake.calls[:stop])==2
+    promote=next(i for i,c in enumerate(fake.calls) if 'promote' in c)
+    assert sum('legacy_backup' in c for c in fake.calls[:promote])==2
+    assert any('coverage' in c for c in fake.calls[:promote])
+    assert (update.folder/'replay/inputs/cmcc/contribution.xlsx').exists()
+    assert result['retained_databases']['cmcc']=='retained-cmcc'
+
+
+@pytest.mark.parametrize('failure',['replay','legacy_backup','coverage'])
+def test_initial_failures_leave_legacy_database_selected(tmp_path,failure):
+    update,fake=replay_fixture(tmp_path,failure=failure)
+    with pytest.raises(release.UpdateError):update.execute()
+    assert not update.data_started
+    assert not any('promote' in c for c in fake.calls)
+    assert not any('up' in c for c in fake.calls)
+    if update.web_stopped:assert ['podman','start','web-old'] in fake.calls
+
+
+def test_unknown_promotion_result_holds_backend_stopped(tmp_path):
+    update,fake=replay_fixture(tmp_path,failure='promote')
+    with pytest.raises(release.UpdateError):update.execute()
+    assert update.data_started
+    assert ['podman','start','web-old'] not in fake.calls
+    assert not any('up' in c for c in fake.calls)
+
+
+def test_nonempty_staging_requires_its_own_replay_folder(tmp_path):
+    update,fake=replay_fixture(tmp_path)
+    update.args.staging_resubmit_folder=None
+    with pytest.raises(release.UpdateError,match='Nonempty staging'):update.discover()
+    assert not any(c[1] in {'build','stop'} for c in fake.calls)
+
+
+def test_resume_after_promotion_attempt_is_refused(tmp_path):
+    update,fake=replay_fixture(tmp_path,failure='promote')
+    with pytest.raises(release.UpdateError):update.execute()
+    previous=update.folder
+    second,_=replay_fixture(tmp_path/'retry')
+    second.args.resume_import=previous
+    with pytest.raises(release.UpdateError,match='pre-promotion'):second.execute()
+
+
+def test_replay_cli_requires_uploader_attribution():
+    with pytest.raises(SystemExit):release.arguments(['preview','--resubmit-folder','incoming'])

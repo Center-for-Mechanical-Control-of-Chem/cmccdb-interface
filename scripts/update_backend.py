@@ -126,6 +126,7 @@ class Release:
         self.compose_file=self.repo/'cmccdb_interface'/TARGETS[args.target][0]
         self.web_service, self.db_service=TARGETS[args.target][1:3]
         self.folder=None; self.web_stopped=False; self.data_started=False
+        self.replay_mode=bool(args.resubmit_folder)
         if args.project_name:self.project=args.project_name
 
     def command(self,*arguments,**kwargs):return self.runner.run([self.engine,*arguments],**kwargs)
@@ -237,11 +238,27 @@ class Release:
             "SELECT coalesce(sum(pg_database_size(datname)),0) FROM pg_database WHERE datname IN ('cmcc','staging')").stdout.decode().strip())
         self.archive_minimum=sum(sizes)+2*database_bytes+256*1024*1024
         # Verify actual old image prerequisites with old, effective source.
-        for database in self.databases:self.old_worker('probe',database)
+        self.replay_folders={}
+        self.legacy_counts={}
+        if self.replay_mode:
+            for database in self.databases:
+                folder=self.args.resubmit_folder if database=='cmcc' else self.args.staging_resubmit_folder
+                count=int(self.command('exec',self.db_id,'psql','-U',user,'-d',database,'-Atc',
+                    'SELECT count(*) FROM cmccdb.dataset').stdout.decode().strip())
+                self.legacy_counts[database]=count
+                if folder:
+                    if folder.is_symlink() or not folder.is_dir():raise UpdateError('XLSX folder is missing or is a symlink: '+str(folder))
+                    self.replay_folders[database]=folder.resolve()
+                elif count:
+                    raise UpdateError('Nonempty '+database+' requires its own XLSX folder; supply --staging-resubmit-folder')
+        else:
+            for database in self.databases:self.old_worker('probe',database)
         return {'target':self.args.target,'project':self.project,'web_container':self.web_id,
             'database_container':self.db_id,'cluster':self.cluster,'old_web_image':self.old_image,
             'old_database_image':self.db_image,'build_target':self.args.build_target or TARGETS[self.args.target][3],
-            'databases':self.databases,'archives':str(self.archive_root),'estimated_minimum_archive_bytes':self.archive_minimum}
+            'databases':self.databases,'archives':str(self.archive_root),'estimated_minimum_archive_bytes':self.archive_minimum,
+            'migration_mode':'xlsx_replay' if self.replay_mode else 'additive',
+            'xlsx_folders':{k:str(v) for k,v in self.replay_folders.items()}}
 
     def old_worker(self,action,database):
         result=self.command('exec','--interactive','--env','CMCCDB_RELEASE_TARGET='+self.args.target,
@@ -304,10 +321,19 @@ class Release:
         write_json(self.folder/'candidate-source-sha256.json',manifests)
         return destination
 
-    def new_worker(self,action,database,baseline=None):
+    def new_worker(self,action,database,baseline=None,*,initial=False):
         args=['run','--rm',*self.tool_user,'--interactive','--network',self.network,'--env-file',str(self.folder/'worker.private.env'),
             '--volume',str(self.folder/'snapshots')+':/app/backups:z','--entrypoint','/opt/venv/bin/python',self.candidate_image,'-',action,database]
-        if baseline:args += ['--baseline','/app/backups/'+baseline]
+        if initial:
+            # Insert the bind before the image/command, never into Python arguments.
+            position=args.index('--entrypoint')
+            args[position:position]=['--volume',str(self.folder/'replay')+':/release:z']
+            if database in self.replay_folders:
+                args[position:position]=['--volume',str(self.folder/'replay/inputs'/database)+':/incoming:ro,z']
+            args += ['--initial-spec','/release/initial.json']
+            if action=='replay':args += ['--folder','/incoming','--report','/release/batch-'+database+'.json',
+                '--uploader-name',self.args.uploader_name,'--uploader-email',self.args.uploader_email]
+        elif baseline:args += ['--baseline','/app/backups/'+baseline]
         return self.result(self.command(*args,data=self.worker))
 
     def immutable_database(self):
@@ -365,7 +391,9 @@ class Release:
                     raise UpdateError('Old source archive contains a link or unsafe path; inspect it before updating')
         context=self.snapshot_source()
         # Recheck the old schema after freezing the candidate source.
-        for database in self.databases:self.old_worker('probe',database)
+        if not self.replay_mode:
+            for database in self.databases:self.old_worker('probe',database)
+        else:self.freeze_replay()
         build_target=self.args.build_target or TARGETS[self.args.target][3]
         self.candidate_image='localhost/cmccdb-release:'+self.folder.name.lower()
         self.state('building_candidate',candidate_image=self.candidate_image)
@@ -385,26 +413,24 @@ class Release:
         if any('\n' in value or '\r' in value for value in private_env.values()):
             raise UpdateError('Multiline connection settings are not supported by container env files')
         (self.folder/'worker.private.env').write_text(''.join(k+'='+v+'\n' for k,v in private_env.items()))
-        self.immutable_database()
-        self.state('stopping_backend',candidate_image_id=self.candidate_id)
-        self.web_stopped=True
-        self.command('stop','--time','60',self.web_id)
-        self.baselines={}
-        for database in self.databases:
-            self.state('backing_up_'+database)
-            # A stopped container cannot exec; use a maintenance-only copy of the
-            # OLD image with its archived effective source and original environment.
-            self.baselines[database]=self.backup_old(database)
-        for database,data in self.baselines.items():
-            self.state('rehearsing_'+database)
-            result=self.new_worker('rehearse',data['restore_verification']['database'],'baseline-'+database+'.json')
-            write_json(self.folder/('rehearsal-'+database+'.json'),result)
-        self.immutable_database()
-        for database in self.databases:
-            self.data_started=True
-            self.state('migrating_'+database,data_started=True)
-            result=self.new_worker('apply',database,'baseline-'+database+'.json')
-            write_json(self.folder/('migration-'+database+'.json'),result)
+        if self.replay_mode:self.initial_replay()
+        else:
+            self.stop_backend()
+            self.baselines={}
+            for database in self.databases:
+                self.state('backing_up_'+database)
+                # A stopped container cannot exec; use its archived effective source.
+                self.baselines[database]=self.backup_old(database)
+            for database,data in self.baselines.items():
+                self.state('rehearsing_'+database)
+                result=self.new_worker('rehearse',data['restore_verification']['database'],'baseline-'+database+'.json')
+                write_json(self.folder/('rehearsal-'+database+'.json'),result)
+            self.immutable_database()
+            for database in self.databases:
+                self.data_started=True
+                self.state('migrating_'+database,data_started=True)
+                result=self.new_worker('apply',database,'baseline-'+database+'.json')
+                write_json(self.folder/('migration-'+database+'.json'),result)
         self.immutable_database()
         self.state('publishing_backups')
         self.publish_backups(release_config)
@@ -435,6 +461,74 @@ class Release:
         write_json(self.archive_root/('current-'+self.args.target+'.json'),self.journal)
         print('Release and recovery files: '+str(self.folder),flush=True)
         return self.journal
+
+    def stop_backend(self):
+        self.immutable_database()
+        self.state('stopping_backend',candidate_image_id=self.candidate_id)
+        self.web_stopped=True
+        self.command('stop','--time','60',self.web_id)
+
+    def freeze_replay(self):
+        replay=self.folder/'replay';replay.mkdir(mode=0o700)
+        if self.args.resume_import:
+            previous=self.args.resume_import.resolve()
+            journal=json.loads((previous/'release.json').read_text())
+            if (journal['target']!=self.args.target or journal['cluster']!=self.cluster
+                or journal.get('data_started') or journal.get('migration_mode')!='xlsx_replay'):
+                raise UpdateError('Only a pre-promotion replay from this same target/cluster can be resumed')
+            for item in (previous/'replay').iterdir():
+                if item.name=='inputs':continue
+                if item.is_symlink():raise UpdateError('Replay receipt contains a symlink')
+                if item.is_dir():shutil.copytree(item,replay/item.name)
+                else:shutil.copy2(item,replay/item.name)
+            spec=json.loads((replay/'initial.json').read_text())
+            if spec.get('promoted') or set(spec['databases'])!=set(self.databases):
+                raise UpdateError('Replay database set changed or promotion already happened')
+            for database,item in spec['databases'].items():
+                if not item.get('empty') and database not in self.replay_folders:
+                    raise UpdateError('Resume requires every previously supplied XLSX folder')
+                if database in self.replay_folders:item['empty']=False
+        else:
+            identity=uuid.uuid4().hex
+            spec={'id':identity,'target':self.args.target,'cluster':self.cluster,'databases':{}}
+            for database in self.databases:
+                child=uuid.uuid4().hex
+                spec['databases'][database]={'id':child,'import_name':'cmccdb_import_'+child,
+                    'retained_name':'cmccdb_legacy_'+database+'_'+identity,'empty':database not in self.replay_folders}
+        write_json(replay/'initial.json',spec)
+        for database,source in self.replay_folders.items():
+            for item in source.rglob('*'):
+                if item.is_symlink():raise UpdateError('XLSX source folder contains a symlink: '+str(item))
+            destination=replay/'inputs'/database
+            shutil.copytree(source,destination)
+        self.journal['replay_directory']=str(replay)
+
+    def initial_replay(self):
+        self.state('preparing_import_databases')
+        prepared=self.new_worker('initial_prepare','postgres',initial=True)
+        write_json(self.folder/'initial-prepared.json',prepared)
+        for database in self.databases:
+            self.state('resubmitting_'+database)
+            result=self.new_worker('replay',database,initial=True)
+            write_json(self.folder/('resubmit-'+database+'.json'),result)
+            if not result['ok']:
+                raise UpdateError('XLSX replay has failures; inspect replay/batch-'+database+'.json and resume after fixing them')
+        self.stop_backend()
+        for database in self.databases:
+            self.state('backing_up_legacy_'+database)
+            result=self.new_worker('legacy_backup',database,initial=True)
+            write_json(self.folder/('baseline-'+database+'.json'),result)
+        self.state('checking_legacy_coverage')
+        coverage=self.new_worker('coverage','postgres',initial=True)
+        write_json(self.folder/'legacy-coverage.json',coverage)
+        if not coverage['ok']:
+            raise UpdateError('XLSX folder does not cover every legacy dataset/reaction ID; inspect legacy-coverage.json')
+        self.immutable_database()
+        self.data_started=True
+        self.state('promoting_import_databases',data_started=True)
+        result=self.new_worker('promote','postgres',initial=True)
+        write_json(self.folder/'promotion.json',result)
+        self.journal['retained_databases']=result['retained_databases']
 
     def backup_old(self,database):
         # Extract trusted, self-created source archive to the private release folder.
@@ -489,7 +583,17 @@ def arguments(argv=None):
     parser.add_argument('--schema-ref',help='Build this existing Git ref without modifying the live checkout')
     parser.add_argument('--plan',action='store_true',help='Read-only deployment/schema checks; no archives, build, stop or migrations')
     parser.add_argument('--health-timeout',type=int,default=180)
-    return parser.parse_args(argv)
+    parser.add_argument('--resubmit-folder',type=Path,help='Initial migration: replay this XLSX folder into a fresh main database')
+    parser.add_argument('--staging-resubmit-folder',type=Path,help='Separate XLSX folder for a nonempty staging database')
+    parser.add_argument('--uploader-name',help='Fallback record creator attribution for XLSX replay')
+    parser.add_argument('--uploader-email',help='Fallback record creator email for XLSX replay')
+    parser.add_argument('--resume-import',type=Path,help='Resume a failed archive whose database promotion was never attempted')
+    args=parser.parse_args(argv)
+    if args.resubmit_folder and not (args.uploader_name and args.uploader_email):
+        parser.error('--resubmit-folder requires --uploader-name and --uploader-email')
+    if not args.resubmit_folder and (args.staging_resubmit_folder or args.resume_import):
+        parser.error('Replay/resume options require --resubmit-folder')
+    return args
 
 
 def main(argv=None):

@@ -140,7 +140,7 @@ def bootstrap(engine):
                 schema_updates.record_version(connection)
 
 
-def create(engine, database, connection=None):
+def create(engine, database, connection=None, *, legacy=False):
     snapshot_id = str(uuid.uuid4())
     directory = _directory(snapshot_id)
     directory.mkdir(mode=0o700)
@@ -157,7 +157,9 @@ def create(engine, database, connection=None):
                 raise ValueError(f'pg_dump must be at least PostgreSQL {server.split(".")[0]}')
             exported = connection.scalar(text('SELECT pg_export_snapshot()'))
             baseline = schema_updates._baseline(connection)
-            payload = bytes(baseline) if baseline is not None else schema_updates.descriptors()
+            # A legacy replay must never label its old database with the new proto.
+            # The archived old source is the recovery source when no descriptor was tracked.
+            payload = bytes(baseline) if baseline is not None else (b'' if legacy else schema_updates.descriptors())
             (directory / 'schema.pb').write_bytes(payload)
             (directory / 'schema.pb').chmod(0o600)
             _run([tool('pg_dump'), '--format=custom', '--snapshot', exported,
@@ -177,6 +179,8 @@ def create(engine, database, connection=None):
                     'server_version': server, 'pg_dump_version': version, 'extensions': extensions,
                     'dump_sha256': _digest(dump), 'schema_sha256': _digest(directory / 'schema.pb'),
                     'schema_tracked': baseline is not None,
+                    'schema_descriptor_source': 'tracked database descriptor' if baseline is not None else (
+                        'unavailable; use archived old source' if legacy else 'installed untracked descriptor'),
                     'tables': tables, 'sequences': sorted(sequences),
                     'verified': True, 'verification': 'archive-readable, checksummed; restore verification is separate',
                     'scope': 'Database data, schemas, indexes, constraints, sequences, extensions and large objects. Cluster roles, credentials, application source and external files are separate.'}
@@ -205,9 +209,9 @@ def manifest(snapshot_id):
     return data
 
 
-def create_verified(engine, database, connection=None):
+def create_verified(engine, database, connection=None, *, legacy=False):
     """Exercise recovery before applying a migration, not only archive readability."""
-    data = create(engine, database, connection)
+    data = create(engine, database, connection, legacy=legacy)
     data['restore_verification'] = restore(data['id'])
     _atomic_json(_directory(data['id']) / 'manifest.json', data)
     # Republish the downloadable manifest along with the unchanged dump.

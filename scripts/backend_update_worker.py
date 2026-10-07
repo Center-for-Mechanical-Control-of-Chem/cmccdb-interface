@@ -104,8 +104,19 @@ def verify(engine, baseline=None):
             'first_reaction': first, 'schema_sha256': preview['schema_sha256']}
 
 
-def execute(action, database, baseline_path=None):
+def execute(action, database, baseline_path=None, *, initial_spec=None, folder=None,
+            report=None, uploader_name=None, uploader_email=None):
     guard()
+    if action in {'initial_prepare', 'legacy_backup', 'replay', 'coverage', 'promote'}:
+        from cmccdb_interface.database import initial_migration
+        _, spec = initial_migration.spec_file(initial_spec)
+        if spec['cluster'] != os.environ['CMCCDB_EXPECTED_CLUSTER'] or spec['target'] != os.environ['CMCCDB_RELEASE_TARGET']:
+            raise ValueError('Initial migration specification belongs to another cluster/target')
+        if action == 'initial_prepare':return initial_migration.prepare(initial_spec)
+        if action == 'legacy_backup':return initial_migration.legacy_backup(initial_spec, database)
+        if action == 'replay':return initial_migration.replay(initial_spec, database, folder, report, uploader_name, uploader_email)
+        if action == 'coverage':return initial_migration.coverage(initial_spec)
+        return initial_migration.promote(initial_spec)
     from sqlalchemy import inspect, text
     from cmccdb_schema.orm import schema_updates
     from cmccdb_schema.orm.mappers import Base
@@ -172,9 +183,16 @@ def execute(action, database, baseline_path=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', choices=['probe','backup','rehearse','apply','verify','http'])
+    parser.add_argument('action', choices=['probe','backup','rehearse','apply','verify','http',
+        'initial_prepare','legacy_backup','replay','coverage','promote'])
     parser.add_argument('database')
     parser.add_argument('--baseline')
+    parser.add_argument('--initial-spec')
+    parser.add_argument('--folder')
+    parser.add_argument('--report')
+    parser.add_argument('--uploader-name')
+    parser.add_argument('--uploader-email')
     args = parser.parse_args()
-    result = execute(args.action, args.database, args.baseline)
+    result = execute(args.action, args.database, args.baseline, initial_spec=args.initial_spec,
+        folder=args.folder, report=args.report, uploader_name=args.uploader_name, uploader_email=args.uploader_email)
     print('CMCCDB_RELEASE_RESULT='+json.dumps(result, sort_keys=True))
