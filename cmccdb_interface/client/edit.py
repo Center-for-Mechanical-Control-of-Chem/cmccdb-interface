@@ -84,14 +84,10 @@ def upload_dataset():
 
         uploader_info = get_uploader_info()
         file_name = flask.request.files['uploadFile'].filename
-        body = flask.request.files['uploadFile'].read(datasets.MAX_UPLOAD_BYTES + 1)
-        auxiliary_files = {}
-        for key, attachment in flask.request.files.items(multi=True):
-            if key == 'uploadFile':
-                continue
-            if attachment.filename in auxiliary_files:
-                raise ValueError('Auxiliary file names must be unique')
-            auxiliary_files[attachment.filename] = attachment.read(datasets.MAX_UPLOAD_BYTES + 1)
+        from ..database import auxiliary
+        body = auxiliary.read_upload(flask.request.files['uploadFile'])
+        auxiliary_files = auxiliary.collect_uploads([
+            attachment for key, attachment in flask.request.files.items(multi=True) if key != 'uploadFile'])
 
         perform_backup = flask.request.args.get("perform_backup")
         if (

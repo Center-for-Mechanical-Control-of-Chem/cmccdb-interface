@@ -20,6 +20,7 @@ import conditionUtil from '@/utils/conditions'
 import outcomesUtil from '@/utils/outcomes'
 import reaction_pb from 'cmccdb-schema'
 import CopyButton from '@/components/CopyButton'
+import { summaryOutcome, preferredIdentifier, productYield, formatPercentage, reactionIdentifier } from '@/utils/reactionSummary'
 
 export default {
   props: {
@@ -37,6 +38,19 @@ export default {
       selectedReactions: [],
       reactionTable: null
     }
+  },
+  computed: {
+    reactionId() { return reactionIdentifier(this.reaction) },
+    reactionData() { return this.reaction?.data || {} },
+    summary() { return summaryOutcome(this.reactionData) },
+    products() { return this.summary.productsList || [] },
+    creator() { return this.reactionData.provenance?.recordCreated?.person || {} },
+    uploadDate() {
+      const value = this.reactionData.provenance?.recordCreated?.time?.value
+      const date = value ? new Date(value) : null
+      return date && !isNaN(date.valueOf()) ? date.toLocaleDateString() : 'Not listed'
+    },
+    provenance() { return this.reactionData.provenance || {} },
   },
   methods: {
     getSearchParams() {
@@ -56,50 +70,43 @@ export default {
       return queryString
     },
     getReactionTable() {
-       //TODO: pass this somewhere external so we don't recompute it every time...
-      const queryString=this.getDBQuery()
-      fetch(`/api/render/${this.reaction.reaction_id}${queryString}`)
-        .then(response => response.json())
-        .then(responseData => {
-          this.reactionTable = responseData
+      const queryString = this.getDBQuery()
+      fetch(`/api/render/${this.reactionId}${queryString}`)
+        .then(response => {
+          if (!response.ok) throw new Error('Reaction rendering failed')
+          return response.json()
         })
+        .then(responseData => { this.reactionTable = responseData })
+        .catch(() => { this.reactionTable = '[Reaction cannot be displayed]' })
     },
-    getYield(measurements) {
-      const yieldObj = measurements.find(m => m.type == 3) // cmccdb-schema type 3 == "YIELD"
-      if (yieldObj?.percentage) {
-        return `${yieldObj.percentage.value}%`
-      } else {
-        return "Not listed"
-      }
-    },
-    getConversion(reaction) {
-      if (!reaction.outcomesList[0].conversion) return "Not listed"
-      // decode conversion
-    },
+    preferredIdentifier,
+    productYield,
+    getConversion() { return formatPercentage(this.summary.conversion) },
     conditionsAndDuration(reaction) {
       const details = []
+      const conditions = reaction?.conditions || {}
       // get temp
-      const tempSetPoint = conditionUtil.tempSetPoint(reaction.conditions.temperature?.setpoint)
+      const tempSetPoint = conditionUtil.tempSetPoint(conditions.temperature?.setpoint)
       if (tempSetPoint !== "None")
         details.push(`at ${tempSetPoint}`)
 
       // get Pressure
-      const pressureSetPoint = conditionUtil.pressureSetPoint(reaction.conditions.pressure?.setpoint)
+      const pressureSetPoint = conditionUtil.pressureSetPoint(conditions.pressure?.setpoint)
       if (pressureSetPoint !== "None")
         details.push(`under ${pressureSetPoint}`)
 
       // get duration
-      const formattedTime = outcomesUtil.formattedTime(reaction.outcomesList[0]?.reactionTime)
+      const formattedTime = outcomesUtil.formattedTime(this.summary.reactionTime)
       if (formattedTime && formattedTime !== "None" && formattedTime !== undefined)
         details.push(`for ${formattedTime}`)
 
       // get stir
-      const stirType = conditionUtil.stirType(reaction.conditions.stirring?.type)
+      const stirType = conditionUtil.stirType(conditions.stirring?.type)
       if (stirType && stirType !== "None" && stirType !== undefined)
         details.push(`under ${stirType}`)
 
       // get mechano
-      const mechType = conditionUtil.mechType(reaction.conditions.mechanochemistry?.type)
+      const mechType = conditionUtil.mechType(conditions.mechanochemistry?.type)
       if (mechType && mechType !== "None" && mechType !== undefined)
         details.push(`with ${mechType}`)
 
@@ -108,7 +115,7 @@ export default {
     productIdentifier(identifier) {
       const identifierTypes = reaction_pb.CompoundIdentifier.CompoundIdentifierType
       const identifierType = Object.keys(identifierTypes).find(key => identifierTypes[key] == identifier.type)
-      return `${identifierType}: ${identifier.value}`
+      return `${identifierType || "Identifier"}: ${identifier.value}`
     },
     updateSelectedReactions(event) {
       if (event.target.checked) {
@@ -133,12 +140,12 @@ export default {
     .select(v-if='isSelectable')
       input(
         type="checkbox"
-        :id='"select_"+reaction.reaction_id'
-        :value='reaction.reaction_id'
+        :id='"select_"+reactionId'
+        :value='reactionId'
         :checked='isSelected'
         @change='$emit("clickedSelect", $event)'
       )
-      label(:for='"select_"+reaction.reaction_id') Select reaction
+      label(:for='"select_"+reactionId') Select reaction
     .reaction-table(
       v-html='reactionTable'
       v-if='reactionTable'
@@ -147,25 +154,26 @@ export default {
     .info
       .col.full
         router-link(
-          :to='{ name: "reaction-view", params: {reactionId: reaction.reaction_id}, query:{database:getDBName()}}'
+          :to='{ name: "reaction-view", params: {reactionId: reactionId}, query:{database:getDBName()}}'
         ) 
           button View Full Details
       .col
-        .yield Yield: {{getYield(reaction.data.outcomesList[0].productsList[0].measurementsList)}}
-        .conversion Conversion: {{getConversion(reaction.data)}}
-        .conditions Conditions: {{conditionsAndDuration(reaction.data).join("; ") || "Not Listed"}}
-        .smile(v-if='reaction.data.outcomesList[0].productsList[0].identifiersList.length')
-          CopyButton(
-            :textToCopy='reaction.data.outcomesList[0].productsList[0].identifiersList[0].value'
-          )
-          .value Product {{productIdentifier(reaction.data.outcomesList[0].productsList[0].identifiersList[0])}}
+        .conversion Conversion: {{getConversion()}}
+        .conditions Conditions: {{conditionsAndDuration(reactionData).join("; ") || "Not Listed"}}
+        template(v-if='products.length')
+          .product(v-for='(product, idx) in products' :key='idx')
+            .yield Yield{{products.length > 1 ? ` (product ${idx + 1})` : ""}}: {{productYield(product)}}
+            .smile(v-if='preferredIdentifier(product)')
+              CopyButton(:textToCopy='preferredIdentifier(product).value')
+              .value Product {{productIdentifier(preferredIdentifier(product))}}
+        .yield(v-else) Yield: Not listed
       .col
-        .creator Uploaded by {{reaction.data.provenance.recordCreated.person.name}}, {{reaction.data.provenance.recordCreated.person.organization}}
-        .date Uploaded on {{new Date(reaction.data.provenance.recordCreated.time.value).toLocaleDateString()}}
-        .doi DOI: {{reaction.data.provenance.doi}}
-        .publication 
+        .creator Uploaded by {{creator.name || "Not listed"}}{{creator.organization ? `, ${creator.organization}` : ""}}
+        .date Uploaded on {{uploadDate}}
+        .doi DOI: {{provenance.doi || "Not listed"}}
+        .publication(v-if='provenance.publicationUrl')
           a(
-            :href='reaction.data.provenance.publicationUrl'
+            :href='provenance.publicationUrl'
             target="_blank"
           ) Publication URL
         .dataset Dataset: {{reaction.dataset_id}}

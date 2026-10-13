@@ -31,7 +31,8 @@ state.setAuxFiles(event([file('plot.png'), file('spectrum.csv')]))
 assert.equal(state.auxFiles.length, 2)
 state.removeAuxFile(0)
 assert.equal(state.auxFiles[0].name, 'spectrum.csv')
-for (const rejected of [Array.from({ length: 6 }, (_, i) => file(`file${i}`)), [file('big.png', state.maxFileSize + 1)], [file('same'), file('same')]]) {
+assert.equal(state.maxAuxFiles, 64)
+for (const rejected of [Array.from({ length: state.maxAuxFiles + 1 }, (_, i) => file(`file${i}`)), [file('big.png', state.maxFileSize + 1)], [file('same'), file('same')]]) {
   state.setAuxFiles(event([file('old.png')]))
   const selection = event(rejected)
   state.setAuxFiles(selection)
@@ -72,4 +73,18 @@ window.location.search = '?database=cmcc'
 state.submitUpload()
 assert.equal(requests.length, 1, 'Nonmembers cannot upload to primary')
 assert.ok(alerts.length)
+window.location.search = '?database=staging'
+state.inUpload = false
+state.setAuxFiles(event(Array.from({ length: 12 }, (_, i) => file(`audit.v2.part-${i}.json.gz`, 100))))
+state.submitUpload()
+assert.equal(requests.length, 2)
+assert.equal(requests[1].payload.entries.length, 13, 'The workbook and every audit attachment must be sent')
+assert.equal(requests[1].payload.entries[12][2], 'audit.v2.part-11.json.gz')
+state.inUpload = false
+state.setAuxFiles(event(Array.from({ length: state.maxAuxFiles }, (_, i) => file(`part-${i}`, 1))))
+assert.equal(state.auxFiles.length, state.maxAuxFiles)
+state.setAuxFiles(event(Array.from({ length: 6 }, (_, i) => file(`large-${i}`, state.maxFileSize))))
+state.submitUpload()
+assert.equal(requests.length, 2, 'Aggregate limit includes dataset bytes, even when every attachment fits individually')
+assert.match(state.fileError, /30MiB/)
 console.log('Upload component checks passed (selection limits, stale files, removals, multipart, access and errors).')

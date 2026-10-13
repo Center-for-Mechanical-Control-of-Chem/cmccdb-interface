@@ -21,7 +21,14 @@ from cmccdb_schema.proto import dataset_pb2
 def sample():
     dataset = dataset_pb2.Dataset(dataset_id='cmcc_dataset-' + 'a' * 32)
     reaction = dataset.reactions.add(reaction_id='cmcc-' + 'b' * 32)
-    reaction.outcomes.add().analyses['xas'].data['spectrum'].url = 'a' * 32 + '_spectrum.csv'
+    analysis=reaction.outcomes.add().analyses['xas'];analysis.type=analysis.XAS
+    analysis.data['spectrum'].url = 'a' * 32 + '_spectrum.csv'
+    reaction.provenance.record_created.time.value='2026-10-08T00:00:00+0000'
+    reaction.provenance.record_created.person.name='Upload format fixture'
+    reaction.provenance.record_created.person.email='fixture@example.invalid'
+    compound=reaction.inputs['fixture'].components.add(reaction_role='REACTANT')
+    compound.identifiers.add(type='NAME',value='Fixture input')
+    compound.amount.mass.value=1;compound.amount.mass.units=1
     return dataset
 
 
@@ -58,7 +65,7 @@ def test_external_urls_and_all_auxiliary_bytes(sample):
 
 @pytest.mark.parametrize('files,reason', [({'../escape.csv': b''}, 'basenames'),
     ({'a.csv': b'x' * (datasets.MAX_UPLOAD_BYTES + 1)}, '5 MB'),
-    ({f'{i}.csv': b'' for i in range(6)}, 'five')])
+    ({f'{i}.csv': b'' for i in range(datasets.MAX_AUXILIARY_FILES + 1)}, '64')])
 def test_attachment_limits(sample, files, reason):
     with pytest.raises(ValueError, match=reason):
         datasets.attach_auxiliary_files(sample, files)

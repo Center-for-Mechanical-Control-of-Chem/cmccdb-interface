@@ -3,6 +3,7 @@ import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 from . import backups
+from .upload_limits import MAX_AUXILIARY_FILES, MAX_FILE_BYTES, check_upload_budget
 
 from google.protobuf import text_format  # pytype: disable=import-error
 from cmccdb_schema.proto import dataset_pb2
@@ -10,8 +11,7 @@ from cmccdb_schema import message_helpers
 from cmccdb_schema.proto import reaction_pb2
 
 DATASET_EXTENSIONS = ('.pbtxt.gz', '.json.gz', '.pb.gz', '.pbtxt', '.json', '.pb', '.xlsx', '.csv')
-MAX_AUXILIARY_FILES = 5
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = MAX_FILE_BYTES
 
 def split_dataset_filename(filename):
     name = os.path.basename(filename)
@@ -41,8 +41,7 @@ def attach_auxiliary_files(dataset, files):
     """Store attachments in protobuf Data so database exports retain their bytes."""
     if not files:
         return
-    if len(files) > MAX_AUXILIARY_FILES:
-        raise ValueError('At most five auxiliary files are allowed')
+    check_upload_budget(0, files)
     if not dataset.reactions:
         raise ValueError('Auxiliary files require an embedded-reaction dataset')
     for name, body in files.items():
@@ -50,6 +49,11 @@ def attach_auxiliary_files(dataset, files):
             raise ValueError('Auxiliary file names must be basenames')
         if len(body) > MAX_UPLOAD_BYTES:
             raise ValueError(f'Auxiliary file {name} exceeds 5 MB')
+    metadata = dataset.reactions[0].provenance.reaction_metadata
+    for name in files:
+        if 'attachment:' + name in metadata:
+            raise ValueError(f'Attachment {name} already exists')
+    # Check every collision before rewriting any URL or adding any bytes.
     # Older templates prefixed file references with the spreadsheet MD5.
     prefix = dataset.dataset_id.removeprefix('cmcc_dataset-') + '_'
     for data in list(iter_data(dataset)):
@@ -59,11 +63,8 @@ def attach_auxiliary_files(dataset, files):
         if name in files:
             data.bytes_value = files[name]
             data.format = data.format or Path(name).suffix.lstrip('.') or 'bin'
-    metadata = dataset.reactions[0].provenance.reaction_metadata
     for name, body in files.items():
         key = 'attachment:' + name
-        if key in metadata:
-            raise ValueError(f'Attachment {name} already exists')
         metadata[key].CopyFrom(reaction_pb2.Data(
             bytes_value=body, format=Path(name).suffix.lstrip('.') or 'bin', description=name))
 
@@ -122,7 +123,7 @@ def prep_pbtxt_file(
 
         constructor.main({
             "--data":proper_file,
-            "--dataset-name":base_name,
+            "--fallback-dataset-name":base_name,
             "--name":uploader_name,
             "--email":uploader_email
         })
@@ -143,6 +144,7 @@ def prep_and_create_pb_dataset(
     uploader_email=None,
     auxiliary_files=None
 ):
+    check_upload_budget(len(body), auxiliary_files or {})
     file, serialized = prep_pbtxt_file(
         file_name,
         body,

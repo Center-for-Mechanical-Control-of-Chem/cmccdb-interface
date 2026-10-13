@@ -9,9 +9,8 @@ from urllib.parse import quote, unquote, urlsplit
 from google.protobuf import text_format
 
 from . import backups
+from .upload_limits import MAX_AUXILIARY_FILES, MAX_FILE_BYTES, check_auxiliary_count, check_upload_budget
 
-MAX_AUXILIARY_FILES = 5
-MAX_FILE_BYTES = 5 * 1024 * 1024
 
 
 def read_upload(file):
@@ -23,8 +22,7 @@ def read_upload(file):
 
 
 def collect_uploads(files):
-    if len(files) > MAX_AUXILIARY_FILES:
-        raise ValueError(f"You may attach at most {MAX_AUXILIARY_FILES} auxiliary files")
+    check_auxiliary_count(len(files))
     uploads = {}
     for file in files:
         name = file.filename or ""
@@ -35,6 +33,7 @@ def collect_uploads(files):
         if name in uploads:
             raise ValueError(f'Duplicate auxiliary filename: "{name}"')
         uploads[name] = read_upload(file)
+        check_upload_budget(0, uploads)
     return uploads
 
 

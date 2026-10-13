@@ -25,9 +25,11 @@ export default {
         value: null,
         file: null
       },
-      auxFiles: [],          // up to 5 optional auxiliary files
-      maxAuxFiles: 5,
+      auxFiles: [],          // complete audit fragments and other source attachments
+      maxAuxFiles: 64,
       maxFileSize: 5 * 1024 * 1024,  // 5 MB
+      maxRequestSize: 30 * 1024 * 1024, // headroom below the backend's 31 MiB multipart limit
+      fileError: null,
       user: {
         name: null,
         email: null,
@@ -104,10 +106,14 @@ export default {
     async setFile(e) {
       // converts uploaded file into useable array buffer
       const files = e.target.files || e.dataTransfer.files
-      if (!files.length) return console.error('No file')
+      this.uploadFile.file = null
+      this.uploadFile.name = null
+      this.fileError = null
+      if (!files.length) return
       if (files[0].size > this.maxFileSize) {
         e.target.value = ''
-        return alert(`"${files[0].name}" exceeds the 5MB size limit.`)
+        this.fileError = `"${files[0].name}" exceeds the 5MB size limit.`
+        return
       }
       this.uploadFile.loading = true
       this.uploadFile.name = files[0].name
@@ -116,24 +122,36 @@ export default {
     },
     setAuxFiles(e) {
       const files = e.target.files || e.dataTransfer.files
-      if (!files.length) return console.error('No file')
+      this.auxFiles = []
+      this.fileError = null
+      if (!files.length) return
       const selected = Array.from(files)
       if (selected.length > this.maxAuxFiles) {
         e.target.value = ''
-        return alert(`You may attach at most ${this.maxAuxFiles} auxiliary files.`)
+        this.fileError = `You may attach at most ${this.maxAuxFiles} auxiliary files.`
+        return
       }
       const tooLarge = selected.filter((f) => f.size > this.maxFileSize)
       if (tooLarge.length) {
         e.target.value = ''
-        return alert(
-          `The following auxiliary files exceed the 5MB limit: ${tooLarge
+        this.fileError = `The following auxiliary files exceed the 5MB limit: ${tooLarge
             .map((f) => f.name)
             .join(", ")}`
-        )
+        return
+      }
+      if (new Set(selected.map((f) => f.name)).size !== selected.length) {
+        e.target.value = ''
+        this.fileError = 'Auxiliary filenames must be unique.'
+        return
       }
       this.auxFiles = selected
     },
+    removeAuxFile(index) {
+      this.auxFiles.splice(index, 1)
+      this.fileError = null
+    },
     submitUpload() {
+      if (this.inUpload) return
       if (!this.user.ghAuthenticated) {
         return alert("Login with GitHub to upload.")
       }
@@ -145,6 +163,17 @@ export default {
         return alert("Files are still processing. Please try again in a moment.")
       else if (!this.uploadFile.file)
         return alert("You must upload a file for the dataset before submitting.")
+      const files = [this.uploadFile.file, ...this.auxFiles]
+      if (this.auxFiles.length > this.maxAuxFiles || files.some((f) => f.size > this.maxFileSize) ||
+          new Set(this.auxFiles.map((f) => f.name)).size !== this.auxFiles.length) {
+        this.fileError = `Choose at most ${this.maxAuxFiles} unique auxiliary files, each at most 5MB.`
+        return
+      }
+      if (files.reduce((total, f) => total + f.size, 0) > this.maxRequestSize) {
+        this.fileError = 'The dataset and all auxiliary files must total at most 30MiB.'
+        return
+      }
+      this.fileError = null
       // send dataset file to api for upload
 
       this.inUpload = true
@@ -160,14 +189,15 @@ export default {
       });
       xhr.onload = () => {
         this.inUpload = false;
-        let response = JSON.parse(xhr.response);
-        if (xhr.status === 200) {
+        let response
+        try { response = JSON.parse(xhr.response) } catch (_) { response = {} }
+        if (xhr.status === 200 && response.dataset_id) {
           const searchParams = this.getSearchParams()
           searchParams.set("limit", "100")
           searchParams.set("dataset_ids", response["dataset_id"])
           window.location.href = '/search?' + searchParams.toString();
         } else {
-          this.traceback = "ERROR: \n" + response["traceback"]
+          this.traceback = `HTTP ${xhr.status}: ` + (response.traceback || response.message || 'Upload failed; the server returned no JSON error details.')
           alert("An error occured: see the traceback below")
         }
       }
@@ -256,14 +286,18 @@ export default {
   .subtitle Optional auxiliary files:
     .file-picker
       .input
-        label(for='aux-upload') Auxiliary files (up to 5, max 5MB each):
+        label(for='aux-upload') Auxiliary files (up to 64, max 5MB each):
         input#aux-upload(
           type='file'
-          accept='.xlsx,.csv,.png,.jpg,.jpeg,.pdf,.txt,.sdf,.mol,.xyz,.cif'
+          accept='.xlsx,.csv,.png,.jpg,.jpeg,.pdf,.txt,.sdf,.mol,.xyz,.cif,.json,.gz'
           multiple
           v-on:change='(e) => setAuxFiles(e)'
         )
-      .copy(v-if='auxFiles.length') Attached: {{ auxFiles.map(f => f.name).join(", ") }}
+      .copy The dataset and all attachments must total at most 30MiB.
+      .copy(v-for='(file, index) in auxFiles' :key='file.name')
+        | {{ file.name }}
+        button(type='button' @click='removeAuxFile(index)') Remove
+  .error-message(v-if='fileError') {{ fileError }}
   .submit
     button#upload-submit(
       @click='submitUpload'

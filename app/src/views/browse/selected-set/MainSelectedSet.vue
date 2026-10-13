@@ -15,6 +15,7 @@
 -->
 
 <script>
+import { reactionIdentifier } from "@/utils/reactionSummary"
 import LoadingSpinner from '@/components/LoadingSpinner'
 import reaction_pb from "cmccdb-schema"
 import hexToUint from "@/utils/hexToUint"
@@ -38,7 +39,8 @@ export default {
   },
   computed: {
     reactionIds() {
-      return this.$route.query.reaction_ids || []
+      const value = this.$route.query.reaction_ids
+      return Array.isArray(value) ? value : value ? [value] : []
     },
     fullUrl() {
       return window.location.href
@@ -49,7 +51,7 @@ export default {
       this.loading = true
       try {
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", `/api/fetch_reactions`)
+        xhr.open("POST", `/api/fetch_reactions?database=${encodeURIComponent(this.$route.query.database || "cmcc")}`)
         xhr.setRequestHeader("Content-Type", "application/json");
         xhr.onload = () => {
           // if response is good, deserialize reaction and return object from protobuff
@@ -60,6 +62,7 @@ export default {
               const hexString = reaction.proto
               const bytes = hexToUint(hexString)
               reaction.data = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
+          reaction.reaction_id = reactionIdentifier(reaction)
             })
           }
           this.reactions = fetchedReactions

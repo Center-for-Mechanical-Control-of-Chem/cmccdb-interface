@@ -15,6 +15,7 @@
 -->
 
 <script>
+import { reactionIdentifier } from "@/utils/reactionSummary"
 import SearchResults from './SearchResults'
 import LoadingSpinner from '@/components/LoadingSpinner'
 import reaction_pb from "cmccdb-schema"
@@ -55,6 +56,7 @@ export default {
         this.searchResults.forEach((reaction) => {
           const bytes = hexToUint(reaction.proto)
           reaction.data = reaction_pb.Reaction.deserializeBinary(bytes).toObject();
+          reaction.reaction_id = reactionIdentifier(reaction)
         })
         this.loading = false
       } catch (e) {

@@ -44,7 +44,7 @@ main/
   batch.json                    optional per-file settings
 ```
 
-For each workbook, `<workbook-stem>.files/` supplies auxiliary files. The usual limit of five attachments, each at most 5 MB, applies. References to local files must resolve to supplied attachments; dangling references are reported instead of silently losing their data. External URLs are left intact. Do not put unrelated files into the sidecar folder.
+For each workbook, `<workbook-stem>.files/` supplies auxiliary files. Up to 64 attachments are allowed, each at most 5 MiB. The workbook plus all attachments must fit the existing 31 MiB request limit; HTTP multipart overhead also counts toward that limit. Producers should reserve headroom, for example a 30 MiB payload budget. The same bounded count and byte checks apply to HTTP upload and batch preparation. Complete lossless audit fragments and manifests are retained as individual attachments; no files are truncated to fit. References to local files must resolve to supplied attachments; dangling references are reported instead of silently losing their data. External URLs are left intact. Do not put unrelated files into the sidecar folder.
 
 An optional `batch.json` supplies per-file creator attribution, dataset names, old dataset IDs and auxiliary paths. All paths are relative to the input root, and auxiliary mapping keys are basenames:
 

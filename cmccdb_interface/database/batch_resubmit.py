@@ -143,7 +143,10 @@ def _prepare(folder, report_path, uploader_name, uploader_email, target):
                 sidecar = path.with_suffix('.files')
                 if sidecar.is_dir():
                     files = {item.name: str(item.relative_to(root)) for item in sorted(sidecar.iterdir()) if item.is_file()}
+            from .upload_limits import check_auxiliary_count, check_upload_budget
+            check_auxiliary_count(len(files))
             attachments = {filename: input_file(root, relative).read_bytes() for filename, relative in files.items()}
+            check_upload_budget(len(body), attachments)
             identity = config.get('dataset_id', 'cmcc_dataset-' + hashlib.md5(body).hexdigest())
             if not re.fullmatch(r'cmcc_dataset-[0-9a-f]{32}', identity):
                 raise ValueError('Manifest dataset_id must be cmcc_dataset- followed by 32 lowercase hex digits')
@@ -165,7 +168,8 @@ def _prepare(folder, report_path, uploader_name, uploader_email, target):
             normalized.write_bytes(body)
             normalized.chmod(0o600)
             dataset = DatasetConstructor.enumerate_spreadsheet(normalized,
-                name=config.get('dataset_name', path.stem), id=identity.removeprefix('cmcc_dataset-'),
+                name=config.get('dataset_name'), default_name=path.stem,
+                id=identity.removeprefix('cmcc_dataset-'),
                 optional_fields={'record_created': {'time': {'value': record['created_at']}, **contributor}})
             if not dataset.reactions:
                 raise ValueError('XLSX contribution has no reactions')

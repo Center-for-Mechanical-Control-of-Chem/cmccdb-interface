@@ -40,6 +40,8 @@ export default {
     }
   },
   computed: {
+    products() { return this.outcome?.productsList || [] },
+    selectedProduct() { return this.products[this.productsIdx] || this.products[0] },
     reactionTime () {
       return outcomesUtil.formattedTime(this.outcome.reactionTime)
     }
@@ -97,16 +99,16 @@ export default {
         .label Conversion
         .value {{outcome.conversion.value}} {{isNaN(outcome.conversion.precision) ? "" : `± ${outcome.conversion.precision}`}}
   .title Products
-  .sub-section
+  .sub-section(v-if='products.length')
     .tabs
       .tab(
-        v-for='(product, idx) in outcome.productsList'
+        v-for='(product, idx) in products' :key='idx'
         @click='productsIdx = idx'
         :class='productsIdx === idx ? "selected" : ""'
       ) Product {{idx + 1}}
     .compound
       CompoundView(
-        :component='outcome.productsList[productsIdx]'
+        :component='selectedProduct'
       )
     .sub-title Measurements
     .measurements
@@ -114,7 +116,7 @@ export default {
       .label Value
       .label Analysis
       .label Raw
-      template(v-for='measurement in outcome.productsList[productsIdx].measurementsList')
+      template(v-for='(measurement, idx) in selectedProduct.measurementsList || []' :key='idx')
         .value {{getMeasurementType(measurement.type)}}
         .value {{getMeasurementValue(measurement)}}
         .value {{measurement.analysisKey}}
@@ -128,6 +130,7 @@ export default {
     )
       .data
         pre {{rawMeasurement}}
+  .details(v-else) No identified products reported for this outcome.
   template(v-if='outcome.analysesMap?.length')
     .title Analyses
     .sub-section
