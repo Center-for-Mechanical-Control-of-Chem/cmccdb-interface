@@ -197,10 +197,11 @@ export default {
         cursor: pointer
     .reaction-table
       color: black
-      overflow-x: wrap
+      max-width: 100%
+      overflow-x: auto
     .info
       display: grid
-      grid-template-columns: repeat(2, 50%)
+      grid-template-columns: repeat(2, minmax(0, 1fr))
       row-gap: 0.5rem
       column-gap: 1rem
       margin-top: 1rem
@@ -209,6 +210,8 @@ export default {
         button
           font-size: 1.2rem
       .col
+        min-width: 0
+        overflow-wrap: anywhere
         *
           margin-top: 0.5rem
       .smile
@@ -217,7 +220,8 @@ export default {
         align-items: center
         margin-top: 0.25rem
         .value
-          width: 100%
+          min-width: 0
+          flex: 1
           white-space: nowrap
           overflow: hidden
           text-overflow: ellipsis

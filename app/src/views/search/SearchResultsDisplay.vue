@@ -94,9 +94,11 @@ export default {
   width: 95%
   margin: 1rem 2.5%
   display: grid
-  grid-template-columns: auto 1fr
+  grid-template-columns: auto minmax(0, 1fr)
   column-gap: 1rem
   min-width: 800px
+  .search-results
+    min-width: 0
   .search-options-container
     .title
       font-size: 2rem

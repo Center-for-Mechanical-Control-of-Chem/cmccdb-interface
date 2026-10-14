@@ -128,6 +128,92 @@ def inventory(connection):
     return result
 
 
+def _cartridge_context(connection):
+    result = {'postgres_major': connection.scalar(text('SHOW server_version')).split('.')[0],
+              'rdkit_extension': connection.scalar(text("SELECT extversion FROM pg_extension WHERE extname='rdkit'"))}
+    # The supported legacy cartridge exposes rdkit_version; newer cartridges
+    # additionally expose rdkit_toolkit_version. Record the actual function and
+    # version, without issuing an undefined-function query in the snapshot.
+    for function in ('public.rdkit_toolkit_version()', 'public.rdkit_version()'):
+        if connection.scalar(text('SELECT to_regprocedure(:function) IS NOT NULL'), {'function': function}):
+            result.update(rdkit_runtime_function=function,
+                          rdkit_runtime=connection.scalar(text('SELECT ' + function)))
+            return result
+    raise ValueError('Cannot determine the RDKit binary runtime version')
+
+
+def _reaction_cache_present(connection):
+    return connection.scalar(text("""
+        SELECT EXISTS(SELECT 1 FROM pg_attribute a
+          JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+          WHERE n.nspname='rdkit' AND c.relname='reactions' AND a.attname='reaction'
+            AND a.atttypid=to_regtype('public.reaction') AND NOT a.attisdropped)
+    """))
+
+
+def _reaction_cache_rows(connection, *, compare_constructor=False):
+    rebuilt = (', CASE WHEN reaction IS NULL THEN NULL ELSE '
+               'public.reaction_send(public.reaction_from_smiles(reaction_smiles::cstring)) '
+               'END AS reconstructed') if compare_constructor else ''
+    return connection.execute(text('SELECT id, public.reaction_send(reaction) AS original' + rebuilt +
+                                   ' FROM rdkit.reactions ORDER BY id')).mappings().all()
+
+
+def _reaction_cache_hashes(rows, *, verify_constructor=False):
+    result, seen = [], set()
+    for row in rows:
+        original = bytes(row['original']) if row['original'] is not None else None
+        if verify_constructor:
+            rebuilt = bytes(row['reconstructed']) if row['reconstructed'] is not None else None
+            if original != rebuilt:
+                raise ValueError('Native SMILES constructor does not reproduce reaction cache id ' + str(row['id']))
+        if row['id'] in seen:
+            raise ValueError('Duplicate reaction cache row identity')
+        seen.add(row['id'])
+        result.append({'id': row['id'], 'sha256': hashlib.sha256(original).hexdigest() if original is not None else None})
+    return result
+
+
+def _capture_reaction_cache(connection):
+    """Prove that the established ORM constructor reproduces every cached object.
+
+    The logical dump preserves the authoritative reaction_smiles. Cartridge text
+    input can rebuild different query templates, and this legacy cartridge's
+    binary receiver crashed in the development test. Record a reconstruction
+    recipe only after byte-for-byte equality has been proved in the same MVCC
+    snapshot as pg_dump; otherwise refuse the backup.
+    """
+    if not _reaction_cache_present(connection):
+        return None
+    return {'method': 'native-smiles-cache-v1', 'context': _cartridge_context(connection),
+            'rows': _reaction_cache_hashes(_reaction_cache_rows(connection, compare_constructor=True),
+                                           verify_constructor=True)}
+
+
+def _restore_reaction_cache(connection, data):
+    recipe = data.get('reaction_cache')
+    if recipe is None:
+        return
+    if recipe.get('method') != 'native-smiles-cache-v1' or not _reaction_cache_present(connection):
+        raise ValueError('Unsupported reaction cache restoration recipe')
+    if _cartridge_context(connection) != recipe['context']:
+        raise ValueError('Reaction cache restore requires the original PostgreSQL major and RDKit runtime')
+    before = _reaction_cache_hashes(_reaction_cache_rows(connection))
+    if [row['id'] for row in before] != [row['id'] for row in recipe['rows']]:
+        raise ValueError('Restored reaction cache row identities differ from the snapshot')
+    if [row['id'] for row in before if row['sha256'] is None] != [row['id'] for row in recipe['rows'] if row['sha256'] is None]:
+        raise ValueError('Restored reaction cache null states differ from the snapshot')
+    # This is the same constructor used by cmccdb_schema.orm.database to build
+    # the search cache. Only isolated restored cached objects are updated; ids,
+    # reaction_smiles, source protobufs and attachments stay from the dump.
+    connection.execute(text('UPDATE rdkit.reactions SET reaction = '
+                            'public.reaction_from_smiles(reaction_smiles::cstring) '
+                            'WHERE reaction IS NOT NULL'))
+    after = _reaction_cache_hashes(_reaction_cache_rows(connection))
+    if after != recipe['rows']:
+        raise ValueError('Reconstructed reaction cache bytes differ from the original snapshot')
+
+
 def bootstrap(engine):
     """Record the installed descriptor only when it matches the existing database."""
     with schema_updates.migration_lock(engine) as connection:
@@ -165,6 +251,7 @@ def create(engine, database, connection=None, *, legacy=False):
             _run([tool('pg_dump'), '--format=custom', '--snapshot', exported,
                   '--file', str(dump)] + _connection_arguments(database))
             dump.chmod(0o600)
+            reaction_cache = _capture_reaction_cache(connection)
             tables = inventory(connection)
             extensions = dict(connection.execute(text('SELECT extname, extversion FROM pg_extension')).all())
             sequences = []
@@ -179,6 +266,7 @@ def create(engine, database, connection=None, *, legacy=False):
                     'server_version': server, 'pg_dump_version': version, 'extensions': extensions,
                     'dump_sha256': _digest(dump), 'schema_sha256': _digest(directory / 'schema.pb'),
                     'schema_tracked': baseline is not None,
+                    'reaction_cache': reaction_cache,
                     'schema_descriptor_source': 'tracked database descriptor' if baseline is not None else (
                         'unavailable; use archived old source' if legacy else 'installed untracked descriptor'),
                     'tables': tables, 'sequences': sorted(sequences),
@@ -204,6 +292,8 @@ def manifest(snapshot_id):
     data = json.loads((directory / 'manifest.json').read_text())
     if data['format'] != 'cmccdb-postgresql-custom-v1' or not data['verified']:
         raise ValueError('Snapshot is not complete')
+    if data.get('binary_tables'):
+        raise ValueError('Experimental binary cartridge snapshots cannot be restored; create a new native-cache snapshot')
     if _digest(directory / 'database.dump') != data['dump_sha256'] or _digest(directory / 'schema.pb') != data['schema_sha256']:
         raise ValueError('Snapshot checksum mismatch')
     return data
@@ -223,6 +313,31 @@ def create_verified(engine, database, connection=None, *, legacy=False):
     return data
 
 
+def _verification_differences(data, tables, extensions, sequences):
+    """Report only names, counts and digests, never restored row contents."""
+    expected = data['tables']
+    table_differences = {
+        name: {'expected': expected.get(name), 'actual': tables.get(name)}
+        for name in sorted(set(expected) | set(tables))
+        if expected.get(name) != tables.get(name)
+    }
+    extension_differences = {
+        name: {'expected': data['extensions'].get(name), 'actual': extensions.get(name)}
+        for name in sorted(set(data['extensions']) | set(extensions))
+        if data['extensions'].get(name) != extensions.get(name)
+    }
+    expected_sequences, actual_sequences = set(data['sequences']), set(sequences)
+    sequence_differences = {
+        'missing': sorted(expected_sequences - actual_sequences),
+        'unexpected': sorted(actual_sequences - expected_sequences),
+    }
+    if not (table_differences or extension_differences or
+            sequence_differences['missing'] or sequence_differences['unexpected']):
+        return {}
+    return {'tables': table_differences, 'extensions': extension_differences,
+            'sequences': sequence_differences}
+
+
 def restore(snapshot_id):
     """Never accept a destination name, arbitrary archive or --clean option."""
     data = manifest(snapshot_id)
@@ -237,6 +352,7 @@ def restore(snapshot_id):
         engine = manage.get_engine(database_name=destination)
         try:
             with engine.begin() as restored:
+                _restore_reaction_cache(restored, data)
                 tables = inventory(restored)
                 extensions = dict(restored.execute(text('SELECT extname, extversion FROM pg_extension')).all())
                 sequences = sorted(s + '.' + n for s, n in restored.execute(text("SELECT schemaname, sequencename FROM pg_sequences WHERE schemaname NOT LIKE 'pg_%'")).all())
@@ -249,8 +365,15 @@ def restore(snapshot_id):
                         maximum = restored.scalar(text(f'SELECT max(id) FROM cmccdb.{q(table)}'))
                         if maximum is not None and (current < maximum or (current == maximum and not called)):
                             raise ValueError(f'Unsafe restored sequence for {table}')
-            if tables != data['tables'] or extensions != data['extensions'] or sequences != data['sequences']:
-                raise ValueError('Restored database failed table/extension/sequence verification')
+            differences = _verification_differences(data, tables, extensions, sequences)
+            if differences:
+                # Preserve the evidence while withholding the verified-restore
+                # record that would allow this database to be migrated.
+                report = {'snapshot_id': snapshot_id, 'database': destination,
+                          'verified': False, 'differences': differences}
+                _atomic_json(_directory(snapshot_id) / ('verification-failed-' + destination + '.json'), report)
+                raise ValueError('Restored database failed table/extension/sequence verification: ' +
+                                 json.dumps(differences, sort_keys=True))
         finally:
             engine.dispose()
         result = {'snapshot_id': snapshot_id, 'database': destination, 'verified': True,

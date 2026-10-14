@@ -3,7 +3,7 @@ import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 import pytest
 from cmccdb_interface.database import snapshots, maintenance_jobs
 
@@ -41,6 +41,129 @@ def test_corrupt_backup_cannot_be_restored(store):
     (directory/'database.dump').write_bytes(b'corrupted')
     with patch.object(snapshots.manage,'create_raw_connection') as connect:
         with pytest.raises(ValueError,match='checksum mismatch'):snapshots.restore(snapshot_id)
+        connect.assert_not_called()
+
+
+def test_restore_differences_distinguish_missing_changed_and_unexpected_tables():
+    expected = {'tables': {'a': {'rows': 1, 'sha256': 'old'},
+                           'missing': {'rows': 0, 'sha256': 'empty'}},
+                'extensions': {'rdkit': '3.8'}, 'sequences': ['a_id_seq']}
+    actual = {'a': {'rows': 1, 'sha256': 'changed'},
+              'unexpected': {'rows': 0, 'sha256': 'empty'}}
+    differences = snapshots._verification_differences(expected, actual, {'rdkit': '3.9'}, ['new_seq'])
+    assert differences['tables']['a'] == {'expected': expected['tables']['a'], 'actual': actual['a']}
+    assert differences['tables']['missing']['actual'] is None
+    assert differences['tables']['unexpected']['expected'] is None
+    assert differences['extensions']['rdkit'] == {'expected': '3.8', 'actual': '3.9'}
+    assert differences['sequences'] == {'missing': ['a_id_seq'], 'unexpected': ['new_seq']}
+
+
+def test_matching_restore_inventory_has_no_differences():
+    expected = {'tables': {'a': {'rows': 2, 'sha256': 'same'}},
+                'extensions': {'rdkit': '3.8'}, 'sequences': ['b', 'a']}
+    assert snapshots._verification_differences(expected, expected['tables'], expected['extensions'], ['a', 'b']) == {}
+@pytest.mark.parametrize('functions,expected', [
+    ({'public.rdkit_version()': '2019.03.4'}, 'public.rdkit_version()'),
+    ({'public.rdkit_version()': '4.8', 'public.rdkit_toolkit_version()': '2025.09.3'},
+     'public.rdkit_toolkit_version()'),
+])
+def test_cache_runtime_guard_supports_actual_legacy_and_modern_version_functions(functions, expected):
+    class CatalogConnection:
+        def scalar(self, statement, parameters=None):
+            query = str(statement)
+            if query == 'SHOW server_version':
+                return '12.3'
+            if 'FROM pg_extension' in query:
+                return '3.8'
+            if 'to_regprocedure' in query:
+                return parameters['function'] in functions
+            assert query == 'SELECT ' + expected
+            return functions[expected]
+    result = snapshots._cartridge_context(CatalogConnection())
+    assert result['rdkit_runtime_function'] == expected
+    assert result['rdkit_runtime'] == functions[expected]
+    assert result['postgres_major'] == '12'
+
+
+def test_unknown_cache_runtime_is_rejected_instead_of_assuming_compatibility():
+    class UnknownConnection:
+        def scalar(self, statement, parameters=None):
+            if str(statement) == 'SHOW server_version':
+                return '12.3'
+            if 'FROM pg_extension' in str(statement):
+                return '3.8'
+            return False
+    with pytest.raises(ValueError, match='Cannot determine'):
+        snapshots._cartridge_context(UnknownConnection())
+
+
+def test_source_cache_recipe_requires_exact_native_constructor_bytes():
+    rows = [{'id': 1, 'original': memoryview(b'object'), 'reconstructed': memoryview(b'object')},
+            {'id': 3, 'original': None, 'reconstructed': None}]
+    with patch.object(snapshots, '_reaction_cache_present', return_value=True), \
+         patch.object(snapshots, '_cartridge_context', return_value={'runtime': 'same'}), \
+         patch.object(snapshots, '_reaction_cache_rows', return_value=rows):
+        recipe = snapshots._capture_reaction_cache(None)
+    assert recipe['method'] == 'native-smiles-cache-v1'
+    assert recipe['rows'] == [{'id': 1, 'sha256': hashlib.sha256(b'object').hexdigest()},
+                              {'id': 3, 'sha256': None}]
+
+
+def test_unreproducible_source_cache_is_refused():
+    with pytest.raises(ValueError, match='does not reproduce reaction cache id 9'):
+        snapshots._reaction_cache_hashes(
+            [{'id': 9, 'original': b'original', 'reconstructed': b'different'}], verify_constructor=True)
+
+
+def test_duplicate_cache_ids_are_refused():
+    with pytest.raises(ValueError, match='Duplicate'):
+        snapshots._reaction_cache_hashes([{'id': 2, 'original': b'a'}, {'id': 2, 'original': b'a'}])
+
+
+def test_restore_preserves_source_null_cache_state_before_any_update():
+    connection = Mock()
+    data = {'reaction_cache': {'method': 'native-smiles-cache-v1', 'context': {'runtime': 'same'},
+                               'rows': [{'id': 1, 'sha256': hashlib.sha256(b'original').hexdigest()}]}}
+    with patch.object(snapshots, '_reaction_cache_present', return_value=True), \
+         patch.object(snapshots, '_cartridge_context', return_value={'runtime': 'same'}), \
+         patch.object(snapshots, '_reaction_cache_rows', return_value=[{'id': 1, 'original': None}]):
+        with pytest.raises(ValueError, match='null states'):
+            snapshots._restore_reaction_cache(connection, data)
+    connection.execute.assert_not_called()
+
+
+def test_changed_runtime_blocks_cache_reconstruction_before_update():
+    connection = Mock()
+    data = {'reaction_cache': {'method': 'native-smiles-cache-v1', 'context': {'runtime': 'old'}}}
+    with patch.object(snapshots, '_reaction_cache_present', return_value=True), \
+         patch.object(snapshots, '_cartridge_context', return_value={'runtime': 'new'}):
+        with pytest.raises(ValueError, match='original PostgreSQL major and RDKit runtime'):
+            snapshots._restore_reaction_cache(connection, data)
+    connection.execute.assert_not_called()
+
+
+def test_inexact_reconstructed_bytes_fail_restore_verification():
+    connection = Mock()
+    data = {'reaction_cache': {'method': 'native-smiles-cache-v1', 'context': {'runtime': 'same'},
+                               'rows': [{'id': 1, 'sha256': hashlib.sha256(b'original').hexdigest()}]}}
+    with patch.object(snapshots, '_reaction_cache_present', return_value=True), \
+         patch.object(snapshots, '_cartridge_context', return_value={'runtime': 'same'}), \
+         patch.object(snapshots, '_reaction_cache_rows', side_effect=[
+             [{'id': 1, 'original': b'logical dump'}], [{'id': 1, 'original': b'inexact reconstruction'}]]):
+        with pytest.raises(ValueError, match='bytes differ'):
+            snapshots._restore_reaction_cache(connection, data)
+
+
+def test_experimental_binary_archives_are_rejected_before_any_database_is_created(store):
+    snapshot_id = str(uuid.uuid4())
+    directory = store / snapshot_id
+    directory.mkdir()
+    (directory / 'manifest.json').write_text(json.dumps({
+        'format': 'cmccdb-postgresql-custom-v1', 'verified': True,
+        'binary_tables': [{'table': 'reactions', 'file': 'cartridge-reactions.copy'}]}))
+    with patch.object(snapshots.manage, 'create_raw_connection') as connect:
+        with pytest.raises(ValueError, match='Experimental binary'):
+            snapshots.restore(snapshot_id)
         connect.assert_not_called()
 
 
