@@ -7,5 +7,12 @@ services:
       - 80:80
       - 443:443
       - 8070:8070
+    networks:
+      - public-proxy
     volumes:
       - /home/nginx-proxy/logs:/logs:z
+      # Seed this file from the current running proxy before first recreation.
+      - ${CMCCDB_PROXY_CONFIG:-/home/cmccdb-proxy-runtime/nginx.conf}:/etc/nginx/nginx.conf:z
+networks:
+  public-proxy:
+    name: ${CMCCDB_PROXY_NETWORK:-cmccdb-public-proxy}

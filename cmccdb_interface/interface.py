@@ -27,6 +27,7 @@ from cmccdb_interface.client import edit
 from cmccdb_interface.client import authentication
 from cmccdb_interface.client import auxiliary
 from cmccdb_interface.client import maintenance
+from cmccdb_interface.client import release_control
 from cmccdb_interface.visualization import filters
 
 # Set the ketcher distribution as the static folder (the image's, when the code is a mounted copy without one:
@@ -44,6 +45,7 @@ app.register_blueprint(edit.bp)
 app.register_blueprint(authentication.bp)
 app.register_blueprint(auxiliary.bp)
 app.register_blueprint(maintenance.bp)
+release_control.install(app)
 
 session_key = os.environ.get("CMCCDB_SESSION_KEY")
 session_key_file = "/app/credentials/cmccdb_session_key.json"

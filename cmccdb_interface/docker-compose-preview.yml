@@ -36,9 +36,10 @@ services:
       - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
       - CMCCDB_SESSION_KEY=${CMCCDB_SESSION_KEY}
-      - CMCCDB_LAUNCH_DEV_INTERFACE=true
+      - CMCCDB_LAUNCH_DEV_INTERFACE=false
       # the /api/dev endpoints are off unless asked for (docker-compose-dev.yml turns them on with its back end)
-      - CMCCDB_DEV_ENDPOINTS=true
+      - CMCCDB_DEV_ENDPOINTS=false
+      - CMCCDB_DISABLE_GITHUB_BACKUPS=true
       - CMCCDB_MAINTENANCE_API=${CMCCDB_MAINTENANCE_API:-false}
       - CMCCDB_SNAPSHOT_DIR=/app/backups
     image: "${CMCCDB_PREVIEW_IMAGE:-cmccdb/interface-preview:2025.09.3}"
@@ -49,20 +50,10 @@ services:
       target: preview
     ports:
       - "90:80"
-      - "91:95"
     volumes:
       - /home/cmccdb-credentials:/app/credentials:z
-      - /home/cmccdb-ssh-config:/root/.ssh/:z
-      - /home/cmccdb-tmp:/app/tmp:z
-      - /home/cmccdb-data:/app/cmccdb-data:z
+      - /home/cmccdb-preview-tmp:/app/tmp:z
+      - /home/cmccdb-preview-data:/app/cmccdb-data:z
       - cmccdb-preview-backups:/app/backups
-      - /home/cmccdb-schema/cmccdb_schema:/app/cmccdb-schema/cmccdb_schema:z
-      - /home/cmccdb-schema/js/cmccdb-schema:/app/cmccdb-schema/js/cmccdb-schema:z
-      - /home/cmccdb-interface/app:/app/cmccdb-interface/dev:z
-      - preview-node-modules:/app/cmccdb-interface/dev/node_modules
-      - preview-npm-cache:/root/.npm
-      - /home/cmccdb-interface/cmccdb_interface:/app/cmccdb-interface/cmccdb_interface:z
 volumes:
   cmccdb-preview-backups:
-  preview-node-modules:
-  preview-npm-cache:
