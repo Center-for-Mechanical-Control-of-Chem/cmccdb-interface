@@ -61,7 +61,7 @@ export default {
           const url = URL.createObjectURL(xhr.response);
           const link = document.createElement('a');
           link.href = url;
-          link.download = "cmccdb_search_results." + fileType;
+          link.download = "cmccdb_search_results." + (fileType === "csv" ? "zip" : fileType);
           link.click();
           // https://stackoverflow.com/a/56547307.
           setTimeout(() => {
@@ -69,17 +69,34 @@ export default {
             link.remove();
           }, 100);
         } else {
-          this.downloadError = "Download failed. Please try again.";
+          const status = "HTTP " + xhr.status + (xhr.statusText ? " " + xhr.statusText : "");
+          let reference = xhr.getResponseHeader("X-Request-ID") || "";
+          let detail = "The server returned an empty error response. Check the server log.";
           try {
-            const error = JSON.parse(await xhr.response.text());
-            this.downloadError = error.message || this.downloadError;
+            const text = await xhr.response.text();
+            if (text.trim()) {
+              try {
+                const error = JSON.parse(text);
+                detail = typeof error.message === "string" ? error.message :
+                  "The server returned an error without an explanation. Check the server log.";
+                reference = error.request_id || reference;
+              } catch (_) {
+                // Explain HTML proxy/server errors without rendering their markup.
+                detail = /^\s*</.test(text)
+                  ? "The server returned an HTML error page. Check the server log."
+                  : text.trim().slice(0, 500);
+              }
+            }
           } catch (_) {
-            // Keep the readable fallback for HTML and empty error responses.
+            detail = "The server's error response could not be read. Check the server log.";
           }
+          this.downloadError = fileType.toUpperCase() + " download failed (" + status + "). " +
+            detail.slice(0, 1000) + (reference ? " Reference: " + reference : "");
         }
       };
       xhr.onerror = () => {
-        this.downloadError = "Could not connect. Please try the download again.";
+        this.downloadError = fileType.toUpperCase() +
+          " download failed: could not connect to the server. Check that Preview is running and its tunnel is connected.";
       };
       xhr.onloadend = () => { this.downloading = false; };
       xhr.setRequestHeader('Content-Type', 'application/json');
@@ -109,10 +126,10 @@ export default {
           label(for='file-type-select') File type:
           select#file-type-select(v-model='fileType')
             option(value="pb.gz") pb.gz
-            option(value="csv") csv
+            option(value="csv") CSV + attachments (.zip)
             option(value="pbtxt") pbtxt
         .download
-          button(@click='downloadResults' :disabled='downloading') {{downloading ? 'Preparing download…' : 'Download ' + fileType + ' file'}}
+          button(@click='downloadResults' :disabled='downloading') {{downloading ? 'Preparing download…' : fileType === 'csv' ? 'Download CSV bundle (.zip)' : 'Download ' + fileType + ' file'}}
         .download-error(v-if='downloadError' role='alert') {{downloadError}}
 </template>
 
@@ -135,4 +152,8 @@ export default {
       min-width: 7rem
   .download
     margin-top: 2rem
+  .download-error
+    max-width: 44rem
+    padding: 0.5rem
+    overflow-wrap: anywhere
 </style>

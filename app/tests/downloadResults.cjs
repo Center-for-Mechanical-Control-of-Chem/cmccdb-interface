@@ -14,6 +14,7 @@ function fixture(database = 'staging', saved = 'pb.gz') {
     constructor() { requests.push(this); this.headers = {}; }
     open(method, url) { this.method = method; this.url = url; }
     setRequestHeader(name, value) { this.headers[name] = value; }
+    getResponseHeader(name) { return (this.responseHeaders || {})[name] || null; }
     send(body) { this.body = body; }
   }
   const context = {
@@ -43,7 +44,8 @@ test('the Pug/Vue template compiles and enables protobuf text and CSV downloads'
     id: 'downloads', preprocessLang: 'pug' });
   assert.deepEqual(compiled.errors, []);
   assert.match(descriptor.template.content, /option\(value="pbtxt"\) pbtxt/);
-  assert.match(descriptor.template.content, /option\(value="csv"\) csv/);
+  assert.match(descriptor.template.content, /option\(value="csv"\) CSV \+ attachments \(\.zip\)/);
+  assert.match(descriptor.template.content, /Download CSV bundle \(\.zip\)/);
 });
 
 test('format and active database reach the existing download API', () => {
@@ -83,7 +85,7 @@ test('binary gzip remains the default and stale unsupported selections fall back
   assert.equal(new URLSearchParams(requests[0].url.split('?')[1]).get('format'), 'pb.gz');
 });
 
-test('CSV selection is remembered and downloads with the CSV extension', async () => {
+test('CSV selection is remembered and downloads a ZIP with the right extension', async () => {
   const { state, requests, links } = fixture('cmcc', 'csv');
   assert.equal(state.fileType, 'csv');
   state.downloadResults();
@@ -91,7 +93,7 @@ test('CSV selection is remembered and downloads with the CSV extension', async (
   assert.equal(new URLSearchParams(request.url.split('?')[1]).get('format'), 'csv');
   request.status = 200; request.response = {};
   await request.onload(); request.onloadend();
-  assert.equal(links[0].download, 'cmccdb_search_results.csv');
+  assert.equal(links[0].download, 'cmccdb_search_results.zip');
 });
 
 test('HTTP errors show an explanation and do not download an error page', async () => {
@@ -101,7 +103,8 @@ test('HTTP errors show an explanation and do not download an error page', async 
   request.status = 400;
   request.response = { text: async () => JSON.stringify({ message: 'The selected reactions are unavailable.' }) };
   await request.onload(); request.onloadend();
-  assert.equal(state.downloadError, 'The selected reactions are unavailable.');
+  assert.match(state.downloadError, /HTTP 400/);
+  assert.match(state.downloadError, /The selected reactions are unavailable\./);
   assert.equal(state.downloading, false);
   assert.equal(links.length, 0);
 });
@@ -112,9 +115,51 @@ test('non-JSON and network failures provide a readable fallback', async () => {
   requests[0].status = 500;
   requests[0].response = { text: async () => '<html>Server error</html>' };
   await requests[0].onload(); requests[0].onloadend();
-  assert.match(state.downloadError, /Download failed/);
+  assert.match(state.downloadError, /download failed \(HTTP 500\)/);
+  assert.match(state.downloadError, /HTML error page/);
   state.downloadResults();
   requests[1].onerror(); requests[1].onloadend();
-  assert.match(state.downloadError, /Could not connect/);
+  assert.match(state.downloadError, /could not connect/);
   assert.equal(state.downloading, false);
+});
+
+test('CSV validation details and the reference ID reach the user', async () => {
+  const { state, requests, links } = fixture('staging', 'csv');
+  state.downloadResults();
+  requests[0].status = 422;
+  requests[0].statusText = 'Unprocessable Entity';
+  requests[0].response = { text: async () => JSON.stringify({
+    message: 'CSV export could not complete: field larger than field limit (131072).',
+    request_id: 'csv-reference-123',
+  }) };
+  await requests[0].onload(); requests[0].onloadend();
+  assert.match(state.downloadError, /CSV download failed \(HTTP 422 Unprocessable Entity\)/);
+  assert.match(state.downloadError, /field larger than field limit \(131072\)/);
+  assert.match(state.downloadError, /Reference: csv-reference-123/);
+  assert.equal(links.length, 0);
+});
+
+test('HTML proxy errors retain status and header reference without showing markup', async () => {
+  const { state, requests } = fixture('cmcc', 'csv');
+  state.downloadResults();
+  requests[0].status = 502; requests[0].statusText = 'Bad Gateway';
+  requests[0].responseHeaders = { 'X-Request-ID': 'proxy-reference' };
+  requests[0].response = { text: async () => '<html><script>private content</script></html>' };
+  await requests[0].onload(); requests[0].onloadend();
+  assert.match(state.downloadError, /HTTP 502 Bad Gateway/);
+  assert.match(state.downloadError, /HTML error page/);
+  assert.match(state.downloadError, /proxy-reference/);
+  assert.doesNotMatch(state.downloadError, /<script>|private content/);
+});
+
+test('plain-text and empty errors retain HTTP context', async () => {
+  for (const text of ['upstream timed out', '']) {
+    const { state, requests } = fixture();
+    state.downloadResults();
+    requests[0].status = 504;
+    requests[0].response = { text: async () => text };
+    await requests[0].onload(); requests[0].onloadend();
+    assert.match(state.downloadError, /HTTP 504/);
+    assert.match(state.downloadError, text ? /upstream timed out/ : /empty error response/);
+  }
 });

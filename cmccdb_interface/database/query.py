@@ -1555,13 +1555,27 @@ def prep_results_for_json(results: list[query.Result]) -> list[dict]:
     return response
 
 def serialize_query_results(name, results, file_format="pb.gz"):
-    """Serialize search results as binary, readable protobuf text or native CSV."""
+    """Serialize results as protobuf or a CSV ZIP with separate attachment files."""
     if file_format not in {"pb.gz", "pbtxt", "csv"}:
         raise ValueError("Unsupported download format: " + file_format)
+    results = list(results)
     dataset = dataset_pb2.Dataset(name=name, reactions=[result.reaction for result in results])
     if file_format == "pbtxt":
         return io.BytesIO(text_format.MessageToString(dataset, as_utf8=True).encode("utf-8"))
     if file_format == "csv":
-        from cmccdb_schema.spreadsheet import serialize_csv
-        return io.BytesIO(serialize_csv(dataset))
+        from cmccdb_schema.spreadsheet import serialize_csv_bundle
+        from ..client import auxiliary
+
+        dataset_ids = {result.reaction.reaction_id: getattr(result, "dataset_id", "") for result in results}
+
+        def resolve_attachment(reaction_id, url):
+            relative = auxiliary._local_path(url)
+            if relative is None:
+                raise ValueError("Invalid local attachment reference: " + url)
+            path = auxiliary._attachment_file(relative, dataset_ids[reaction_id])
+            if path is None:
+                raise ValueError("Missing or ambiguous local attachment: " + url)
+            return path.read_bytes()
+
+        return io.BytesIO(serialize_csv_bundle(dataset, resolve_attachment=resolve_attachment))
     return io.BytesIO(gzip.compress(dataset.SerializeToString()))

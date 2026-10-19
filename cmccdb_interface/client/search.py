@@ -38,9 +38,11 @@ be URL-encoded.
 # pylint: disable=too-many-locals
 
 import dataclasses
+import csv
 import gzip
 import io
 import os
+import uuid
 from typing import List, Optional, Tuple
 
 import flask
@@ -268,7 +270,7 @@ def get_molfile():
 SEARCH_RESULTS_FILE_NAME = "cmccdb_search_results"
 @bp.route("/api/download_results", methods=["POST"])
 def download_results():
-    """Download search results as a Dataset proto or re-importable CSV."""
+    """Download a Dataset proto or ZIP containing CSV and attachment files."""
     database_name = flask.request.args.get("database")
     file_name = flask.request.args.get("filename", SEARCH_RESULTS_FILE_NAME)
     file_format = flask.request.args.get("format", "pb.gz")
@@ -277,19 +279,35 @@ def download_results():
 
     reaction_ids = [row["Reaction ID"] for row in flask.request.get_json()]
     command = query.ReactionIdQuery(reaction_ids[:MAX_RESULTS])
+    request_id = uuid.uuid4().hex[:12]
     try:
         results = query.QueryHandler(database_name).run_query(command)
-    except query.QueryException as error:
-        return flask.abort(handlers.make_error_response(error, 400))
-    try:
         payload = query.serialize_query_results(file_name, results, file_format=file_format)
-    except ValueError:
-        return flask.jsonify(message=(
-            "These results cannot be represented as a verified CSV. Download pbtxt or pb.gz to preserve all fields."
-        )), 422
-    return flask.send_file(
+    except Exception as error:
+        flask.current_app.logger.exception(
+            "Search download failed request_id=%s format=%s database=%r reactions=%d",
+            request_id, file_format, database_name, min(len(reaction_ids), MAX_RESULTS))
+        if isinstance(error, query.QueryException):
+            status = 400
+            message = "The selected reactions could not be retrieved: " + str(error)[:500]
+        elif file_format == "csv" and isinstance(error, (ValueError, csv.Error)):
+            status = 422
+            reason = " ".join(str(error).split())[:500]
+            message = (f"CSV export could not complete ({type(error).__name__}): {reason}. "
+                       "Download pbtxt or pb.gz to preserve all fields.")
+        else:
+            status = 500
+            message = (f"The server could not prepare the {file_format} download "
+                       f"({type(error).__name__}). Check the server log using the reference ID.")
+        response = flask.jsonify(message=message, request_id=request_id,
+                                 error_type=type(error).__name__, format=file_format)
+        response.headers["X-Request-ID"] = request_id
+        return response, status
+    response = flask.send_file(
         payload,
         as_attachment=True,
-        download_name=file_name + "." + file_format,
-        mimetype={"pbtxt": "text/plain", "csv": "text/csv", "pb.gz": "application/gzip"}[file_format],
+        download_name=file_name + (".zip" if file_format == "csv" else "." + file_format),
+        mimetype={"pbtxt": "text/plain", "csv": "application/zip", "pb.gz": "application/gzip"}[file_format],
     )
+    response.headers["X-Request-ID"] = request_id
+    return response
