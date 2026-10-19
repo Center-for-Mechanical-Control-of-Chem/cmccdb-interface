@@ -268,9 +268,12 @@ def get_molfile():
 SEARCH_RESULTS_FILE_NAME = "cmccdb_search_results"
 @bp.route("/api/download_results", methods=["POST"])
 def download_results():
-    """Downloads search results as a Dataset proto."""
+    """Download search results as a Dataset proto or re-importable CSV."""
     database_name = flask.request.args.get("database")
     file_name = flask.request.args.get("filename", SEARCH_RESULTS_FILE_NAME)
+    file_format = flask.request.args.get("format", "pb.gz")
+    if file_format not in {"pb.gz", "pbtxt", "csv"}:
+        flask.abort(400, description="Supported download formats are pb.gz, pbtxt and csv")
 
     reaction_ids = [row["Reaction ID"] for row in flask.request.get_json()]
     command = query.ReactionIdQuery(reaction_ids[:MAX_RESULTS])
@@ -278,8 +281,15 @@ def download_results():
         results = query.QueryHandler(database_name).run_query(command)
     except query.QueryException as error:
         return flask.abort(handlers.make_error_response(error, 400))
+    try:
+        payload = query.serialize_query_results(file_name, results, file_format=file_format)
+    except ValueError:
+        return flask.jsonify(message=(
+            "These results cannot be represented as a verified CSV. Download pbtxt or pb.gz to preserve all fields."
+        )), 422
     return flask.send_file(
-        query.serialize_query_results(file_name, results),
+        payload,
         as_attachment=True,
-        download_name=file_name+".pb.gz",
+        download_name=file_name + "." + file_format,
+        mimetype={"pbtxt": "text/plain", "csv": "text/csv", "pb.gz": "application/gzip"}[file_format],
     )

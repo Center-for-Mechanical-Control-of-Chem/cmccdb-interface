@@ -52,6 +52,8 @@ import gzip
 import re
 from typing import Dict, List, Optional, Tuple
 
+from google.protobuf import text_format
+
 import psycopg2
 import psycopg2.extensions
 from psycopg2 import sql
@@ -1552,6 +1554,14 @@ def prep_results_for_json(results: list[query.Result]) -> list[dict]:
     if single: response = response[0]
     return response
 
-def serialize_query_results(name, results):
+def serialize_query_results(name, results, file_format="pb.gz"):
+    """Serialize search results as binary, readable protobuf text or native CSV."""
+    if file_format not in {"pb.gz", "pbtxt", "csv"}:
+        raise ValueError("Unsupported download format: " + file_format)
     dataset = dataset_pb2.Dataset(name=name, reactions=[result.reaction for result in results])
+    if file_format == "pbtxt":
+        return io.BytesIO(text_format.MessageToString(dataset, as_utf8=True).encode("utf-8"))
+    if file_format == "csv":
+        from cmccdb_schema.spreadsheet import serialize_csv
+        return io.BytesIO(serialize_csv(dataset))
     return io.BytesIO(gzip.compress(dataset.SerializeToString()))

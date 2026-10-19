@@ -34,29 +34,54 @@ export default {
   },
   data () {
     return {
-      fileType: "pb.gz"
+      fileType: "pb.gz",
+      downloading: false,
+      downloadError: "",
     }
   },
   methods: {
     downloadResults () {
-      // create .pb download of search results
+      if (this.downloading) return;
+      this.downloadError = "";
+      const fileType = this.fileType;
+      if (!["pb.gz", "pbtxt", "csv"].includes(fileType)) {
+        this.downloadError = "Choose a supported download format.";
+        return;
+      }
+      this.downloading = true;
+      const params = new URLSearchParams({
+        format: fileType,
+        database: this.$route.query.database || "cmcc",
+      });
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/download_results');
+      xhr.open('POST', '/api/download_results?' + params.toString());
       xhr.responseType = "blob";
-      xhr.onload = () => {
+      xhr.onload = async () => {
         if (xhr.status === 200) {
           const url = URL.createObjectURL(xhr.response);
           const link = document.createElement('a');
           link.href = url;
-          link.download = "ord_search_results.pb.gz"
+          link.download = "cmccdb_search_results." + fileType;
           link.click();
           // https://stackoverflow.com/a/56547307.
           setTimeout(() => {
             URL.revokeObjectURL(url);
             link.remove();
           }, 100);
+        } else {
+          this.downloadError = "Download failed. Please try again.";
+          try {
+            const error = JSON.parse(await xhr.response.text());
+            this.downloadError = error.message || this.downloadError;
+          } catch (_) {
+            // Keep the readable fallback for HTML and empty error responses.
+          }
         }
       };
+      xhr.onerror = () => {
+        this.downloadError = "Could not connect. Please try the download again.";
+      };
+      xhr.onloadend = () => { this.downloading = false; };
       xhr.setRequestHeader('Content-Type', 'application/json');
 
       // format request json to expected key/value in api
@@ -65,7 +90,8 @@ export default {
     }
   },
   mounted() {
-    this.fileType = this.$store.state.downloadFileType || "pb.gz"
+    const saved = this.$store.state.downloadFileType;
+    this.fileType = ["pb.gz", "pbtxt", "csv"].includes(saved) ? saved : "pb.gz";
   }
 }
 </script>
@@ -83,10 +109,11 @@ export default {
           label(for='file-type-select') File type:
           select#file-type-select(v-model='fileType')
             option(value="pb.gz") pb.gz
-            option(value="csv" disabled) csv (coming soon)
-            option(value="pbtxt" disabled) pbtxt (coming soon)
+            option(value="csv") csv
+            option(value="pbtxt") pbtxt
         .download
-          button(@click='downloadResults') Download {{fileType}} file
+          button(@click='downloadResults' :disabled='downloading') {{downloading ? 'Preparing download…' : 'Download ' + fileType + ' file'}}
+        .download-error(v-if='downloadError' role='alert') {{downloadError}}
 </template>
 
 <style lang="sass" scoped>
