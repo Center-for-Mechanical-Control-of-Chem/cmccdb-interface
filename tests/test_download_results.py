@@ -98,6 +98,58 @@ class DownloadResultsTests(unittest.TestCase):
             self.assertFalse(any(row[0] == "DATASET ID" for row in csv.reader(io.StringIO(text))))
         self.handler.assert_called_once_with("staging")
 
+    def test_single_source_dataset_id_survives_all_download_formats(self):
+        source_id = "cmcc_dataset-" + "b" * 32
+        self.reaction.identifiers.add(type=reaction_pb2.ReactionIdentifier.REACTION_TYPE, value="Pericyclic")
+        second = reaction_pb2.Reaction()
+        second.CopyFrom(self.reaction)
+        second.reaction_id = "cmcc-" + "c" * 32
+        self.results[:] = [query.Result(dataset_id=source_id, reaction_id=reaction.reaction_id,
+                                      proto=reaction.SerializeToString()) for reaction in (self.reaction, second)]
+        for file_format in ("pb.gz", "pbtxt", "csv"):
+            with self.subTest(file_format=file_format):
+                response = self.download("?format=" + file_format)
+                self.assertEqual(response.status_code, 200, response.data)
+                if file_format == "csv":
+                    actual = spreadsheet.load_csv_bundle(response.data)
+                    with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+                        rows = list(csv.reader(io.StringIO(archive.read("reactions.csv").decode())))
+                    self.assertEqual(rows[0][:2], ["DATASET ID", source_id])
+                    self.assertFalse(any(rows[0][2:]))
+                    v = next(i for i, row in enumerate(rows) if row[0] == "VARIANTS")
+                    self.assertIn("REACTION_TYPE", [value for row in rows[:v] for value in row])
+                    self.assertNotIn("REACTION_TYPE", [value for row in rows[v:] for value in row])
+                elif file_format == "pbtxt":
+                    actual = text_format.Parse(response.data.decode(), dataset_pb2.Dataset())
+                else:
+                    actual = dataset_pb2.Dataset.FromString(gzip.decompress(response.data))
+                self.assertEqual(actual.dataset_id, source_id)
+                self.assertEqual(list(actual.reactions), [self.reaction, second])
+
+    def test_mixed_or_partly_unknown_owners_never_claim_one_dataset_id(self):
+        known_id = "cmcc_dataset-" + "b" * 32
+        second = reaction_pb2.Reaction()
+        second.CopyFrom(self.reaction)
+        second.reaction_id = "cmcc-" + "c" * 32
+        for other_id in ("cmcc_dataset-" + "d" * 32, "", None):
+            self.results[:] = [SimpleNamespace(reaction=self.reaction, dataset_id=known_id),
+                               SimpleNamespace(reaction=second, dataset_id=other_id)]
+            for file_format in ("pb.gz", "pbtxt", "csv"):
+                with self.subTest(other_id=other_id, file_format=file_format):
+                    response = self.download("?format=" + file_format)
+                    self.assertEqual(response.status_code, 200, response.data)
+                    if file_format == "csv":
+                        actual = spreadsheet.load_csv_bundle(response.data)
+                        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+                            rows = list(csv.reader(io.StringIO(archive.read("reactions.csv").decode())))
+                        self.assertFalse(any(row[0] == "DATASET ID" for row in rows))
+                    elif file_format == "pbtxt":
+                        actual = text_format.Parse(response.data.decode(), dataset_pb2.Dataset())
+                    else:
+                        actual = dataset_pb2.Dataset.FromString(gzip.decompress(response.data))
+                    self.assertEqual(actual.dataset_id, "")
+                    self.assertEqual(list(actual.reactions), [self.reaction, second])
+
     def test_csv_loss_is_explained_without_returning_a_partial_file(self):
         self.reaction.notes.procedure_details = " boundary text "
         response = self.download("?format=csv")

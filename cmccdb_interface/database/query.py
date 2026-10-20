@@ -1560,6 +1560,13 @@ def serialize_query_results(name, results, file_format="pb.gz"):
         raise ValueError("Unsupported download format: " + file_format)
     results = list(results)
     dataset = dataset_pb2.Dataset(name=name, reactions=[result.reaction for result in results])
+    # Search results retain their source identity only when every reaction has
+    # the same known owner. Missing or mixed owners cannot supply one dataset ID.
+    source_ids = {getattr(result, "dataset_id", None) for result in results}
+    if len(source_ids) == 1:
+        source_id = next(iter(source_ids))
+        if source_id:
+            dataset.dataset_id = source_id
     if file_format == "pbtxt":
         return io.BytesIO(text_format.MessageToString(dataset, as_utf8=True).encode("utf-8"))
     if file_format == "csv":
