@@ -225,16 +225,27 @@ def build_query() -> Tuple[List[query.ReactionQueryBase], Optional[int]]:
 @bp.route("/api/advanced-query", methods=["POST"])
 def advanced_query():
     database_name = flask.request.args.get("database")
-
-    # commands, limit = build_query()
     try:
         if not flask.request.is_json:
             raise ValueError("Search JSON not received")
-        data = flask.request.json
+        raw_limit = flask.request.args.get("limit", str(MAX_RESULTS))
+        if not raw_limit.isdecimal() or int(raw_limit) < 1:
+            raise ValueError("Result limit must be a positive integer")
+        limit = min(int(raw_limit), MAX_RESULTS)
+        data = flask.request.get_json(silent=True)
         commands = [query.AdvancedSearchQuery.from_json(data)]
-        return flask.jsonify(query.run_query(commands, database_name=database_name, prep_json=True))
-    except Exception as error:
-        return flask.abort(handlers.make_error_response(error, 400))
+    except (ValueError, TypeError) as error:
+        return flask.jsonify(message=str(error)), 400
+    try:
+        return flask.jsonify(query.run_query(commands, limit=limit,
+                                             database_name=database_name, prep_json=True))
+    except query.QueryException as error:
+        return flask.jsonify(message=str(error)), 400
+    except Exception:
+        request_id = uuid.uuid4().hex
+        flask.current_app.logger.exception("Advanced Search failed request_id=%s", request_id)
+        return flask.jsonify(message="Advanced Search could not complete. Please try again.",
+                             request_id=request_id), 500
 
 @bp.route("/api/search/display-results", methods=["POST"])
 def render_results():

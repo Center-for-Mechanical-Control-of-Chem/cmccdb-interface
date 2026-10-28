@@ -36,7 +36,8 @@ export default {
         displayedKeys: null,
         queryData: {},
         queryDisplay: "",
-        fieldMaps: {}
+        fieldMaps: {},
+        loadError: ""
     }
   },
   // mounted() {
@@ -188,7 +189,9 @@ export default {
     },
 
     getPrimaryTree() {
-      return reaction_pb["reaction_json"];
+      const schema = reaction_json || reaction_pb["reaction_json"];
+      if (!schema) throw new Error("Search fields could not be loaded. Please refresh the page or contact the database maintainer.");
+      return schema;
       // return this.buildSubTree("Reaction", 1)
     },
 
@@ -275,7 +278,7 @@ export default {
         data = data[k];
       }
       
-      let subdata = this._setupDataTree(baseFields);
+      let subdata = typeof baseFields === "string" ? "" : this._setupDataTree(baseFields);
       data.push(subdata)
     },
     handleAddField(message) {
@@ -343,7 +346,7 @@ export default {
         if (field === "DatasetID") {
           this.displayedFields["DatasetID"] = "string";
         } else {
-          this.displayedFields[field] = reaction_json[field];//this.buildSubTree(this.protoTree["Reaction"][field], 6);
+          this.displayedFields[field] = this.getPrimaryTree()[field];
         }
         this._setupField(this.displayedFields, this.queryData, field)
       }
@@ -363,32 +366,26 @@ export default {
       data[keySpec[keySpec.length - 1]] = value;
     },
 
-    isNonEmptyValue(subqd) {
-      return (
-        (Array.isArray(subqd) && subqd.length > 0)
-        || (typeof subqd === "object" && Object.keys(subqd).length > 0)
-        || (subqd.length > 0)
-        || (!["string", "object"].includes(typeof subqd))
-      )
+    isNonEmptyValue(value) {
+      if (value === null || typeof value === "undefined") return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (typeof value === "object") return Object.keys(value).length > 0;
+      return true;
     },
-    
-    prepQueryJSON(qd) {
-      if (Array.isArray(qd)) {
-        return qd.map(this.prepQueryJSON).filter(this.isNonEmptyValue)
-      } else if (typeof qd !== "object") {
-        return qd;
-      } else {
-        let newD = {};
-        for (const [key, subqd] of Object.entries(qd)) {
-          if (this.isNonEmptyValue(subqd)) {
-            let newSub =  this.prepQueryJSON(subqd);
-            if (this.isNonEmptyValue(newSub)) {
-              newD[key] = newSub;
-            }
-          }
-        }
-        return newD;
+
+    prepQueryJSON(value) {
+      if (Array.isArray(value)) {
+        return value.map(item => this.prepQueryJSON(item)).filter(this.isNonEmptyValue);
       }
+      if (value === null || typeof value !== "object") return value;
+      const result = {};
+      for (const [key, child] of Object.entries(value)) {
+        // KindCase controls the editor; the chosen actual oneof field is the predicate.
+        if (key === "KindCase") continue;
+        const cleaned = this.prepQueryJSON(child);
+        if (this.isNonEmptyValue(cleaned)) result[key] = cleaned;
+      }
+      return result;
     },
 
     updateSearch() {
@@ -397,7 +394,11 @@ export default {
   },
 
   mounted() {
-    this.displayedKeys = this.getKeys();
+    try {
+      this.displayedKeys = this.getKeys();
+    } catch (error) {
+      this.loadError = error.message;
+    }
   }
 }
 </script>
@@ -406,6 +407,7 @@ export default {
 <template lang="pug">
 
 .search-options
+  p(v-if='loadError' role='alert') {{loadError}}
   .search-segment(
     v-for='field in displayedKeys'
   )
@@ -428,7 +430,7 @@ export default {
         @removeField='handleRemoveField'
       )
 
-button(@click='updateSearch') Search
+button(@click='updateSearch' :disabled='!!loadError') Search
       
 </template>
 
@@ -439,7 +441,7 @@ button(@click='updateSearch') Search
 .search-options
   min-height: 90vh
   width: 100%
-  min-width: 10 rem
+  min-width: 0
   .search-segment
     .options-title
       font-size: 1.5rem

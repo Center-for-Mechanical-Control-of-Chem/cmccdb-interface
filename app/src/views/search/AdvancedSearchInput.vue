@@ -5,7 +5,7 @@ export default {
     props:{
         field: String,
         index: Number,
-        data: Object,
+        data: [Object, Array],
         types: Object,
         labeled: Boolean,
         vectorType: Boolean,
@@ -74,6 +74,9 @@ export default {
           this.$emit('removeField', subdata);
         },
         setKindToggle(subdata) {
+          if (this.kindValue !== "N/A" && this.kindValue !== "KindNotSet") {
+            this.$emit('updateValue', {path: [...this.path, this.kindValue], value: ""});
+          }
           this.kindValue = "N/A";
           this.kindToggle = subdata["value"];
           this.kindValue = this.getKindValue();
@@ -114,7 +117,7 @@ export default {
 
 <template lang="pug">
 template(
-    v-if='typeof realType !== "undefined" && path.length < 15'
+    v-if='typeof realType !== "undefined" && path.length <= 32'
 )
   template(
     v-if='Array.isArray(mutData)'
@@ -212,6 +215,7 @@ template(
       v-model='modelData'
       @change='updateValue'
     )
+      option(value='') Any value
       option(
         v-for='(optVal, optName) in realType'
         :value='optVal'
@@ -239,8 +243,11 @@ template(
         v-else-if='["Concrete Type:boolean", "Concrete Type:bool", "boolean", "bool"].includes(realType)'
         type='checkbox'
         v-model='modelData'
-        @input='updateValue'
+        @change='updateValue'
       )
+      .div(
+        v-else-if='realType === "ByteArray"'
+      ) Search binary data by its description or file format.
       .div(
         v-else-if='typeof realType === "string"'
       ) {{realType}}
@@ -325,8 +332,9 @@ template(v-else)
         font-size: 1.2rem
         padding: 0.5rem 1rem
   .suboptions-section
-    width: 100%
-    min-width: 50rem
+    width: auto
+    min-width: 0
+    box-sizing: border-box
     display: block
     margin-left: 0.25rem
   .suboptions-section .flex
@@ -357,6 +365,10 @@ template(v-else)
       border: 1px solid $medgrey
   .suboptions-list-item:not(:last-child)
     border-bottom: 1px solid $bg-primary
+  input.string-value, input.number-value, select
+    max-width: 100%
+    min-width: 0
+    box-sizing: border-box
   input.string-value
     display: flex
   button.addsub-list-item

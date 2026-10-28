@@ -24,6 +24,7 @@ import DownloadResults from '@/components/DownloadResults'
 export default {
   props: {
     searchResults: Array,
+    shareable: {type: Boolean, default: true},
   },
   components: {
     EntityTable,
@@ -58,7 +59,7 @@ export default {
     goToViewSelected() {
       // store storedSet in vuex so we can retrieve it if user comes back from selected-set
       this.$store.commit('setStoredSet', { query: window.location.search, reactions: this.selectedReactions})
-      this.$router.push({ name: 'selected-set', query: {reaction_ids: this.selectedReactions}})
+      this.$router.push({ name: 'selected-set', query: {reaction_ids: this.selectedReactions, database: this.$route.query.database}})
     }
   },
   async mounted() {
@@ -82,6 +83,7 @@ export default {
   ) 
     .action-button-holder
       CopyButton(
+        v-if='shareable'
         :textToCopy='fullUrl'
         icon='share'
         buttonText='Shareable Link'

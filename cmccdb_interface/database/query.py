@@ -50,6 +50,9 @@ import logging
 import io
 import gzip
 import re
+import csv
+import math
+from inflection import underscore
 from typing import Dict, List, Optional, Tuple
 
 from google.protobuf import text_format
@@ -1013,7 +1016,7 @@ class Selectors(enum.Enum):
     Less = "<"
     Greater = ">"
     LessEquals = "<="
-    GreaterEquals = "<="
+    GreaterEquals = ">="
     Contains = "contains"
     Excludes = "does not contain"
     IsAny = "any of"
@@ -1021,183 +1024,228 @@ class Selectors(enum.Enum):
     InRange = "in range"
     NotInRange = "not in range"
 class SchemaQueryFragment(QueryFragment):
-    def __init__(self, query_path, val, selector, dtype=None, root='reaction'):
+    """A typed predicate, with its protobuf relationship path retained."""
+
+    def __init__(self, query_path, val, selector, dtype=None, root='reaction', joins=(), repeated=False, is_enum=False):
         self.path = tuple(query_path)
         self.val = val
         self.selector = Selectors(selector)
         self.dtype = dtype
         self.root = root
+        self.joins = tuple(joins)
+        self.repeated = repeated
+        self.is_enum = is_enum
+
     def to_params(self):
         base = self.val
-        for p in reversed(self.path):
-            base = {p:base}
+        for part in reversed(self.path):
+            base = {part: base}
         return base
 
+    def parameters(self):
+        if self.selector in {Selectors.InRange, Selectors.NotInRange}:
+            return list(self.val)
+        return [self.val]
+
     def validate(self):
-        ...
+        if self.selector not in self.selector_templates:
+            raise ValueError("Unsupported search operator")
 
-    _number = r'((?:[\+\-])?(?:\d*.)?\d+)'
-    _word = r'\w+'
-    selector_mapping = {
-        fr"{Selectors.Equals.value}\s*({_number}|{_word})":Selectors.Equals,
-        fr"{Selectors.NotEquals.value}\s*({_number}|{_word})":Selectors.NotEquals,
-        fr"{Selectors.Less.value}\s*{_number}":Selectors.Less,
-        fr"{Selectors.LessEquals.value}\s*{_number}":Selectors.LessEquals,
-        fr"{Selectors.Greater.value}\s*{_number}":Selectors.Greater,
-        fr"{Selectors.GreaterEquals.value}\s*{_number}":Selectors.GreaterEquals,
-        fr"{Selectors.Contains.value}\s*({_number}|{_word})":Selectors.Contains,
-        fr"{Selectors.Excludes.value}\s*({_number}|{_word})":Selectors.Excludes,
-        fr"{Selectors.IsAny.value}\s*(\[.*\])":Selectors.IsAny,
-        fr"{Selectors.IsNone.value}\s*(\[.*\])":Selectors.IsNone,
-        fr"{Selectors.InRange.value}\s*\[\s*{_number}\s*,\s*{_number}\s*\]":Selectors.InRange,
-        fr"{Selectors.NotInRange.value}\s*\[\s*{_number}\s*,\s*{_number}\s*\]":Selectors.InRange,
-    }
+    _number = r'[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
 
-    numeric_patterns = {
-        r'(?:[\+\-])?(?:\d*)?.\d+':float,
-        r'(?:[\+\-])?\d+':int
-    }
     @classmethod
-    def _numeric_cast(cls, val):
-        test = val.strip()
-        for pattern, cast in cls.numeric_patterns.items():
-            if re.match(pattern, test):
-                val = cast(test)
-                break
-        return val
+    def _numeric_cast(cls, value):
+        if not isinstance(value, str) or not re.fullmatch(cls._number, value.strip()):
+            return value
+        value = value.strip()
+        return float(value) if any(char in value.lower() for char in '.e') else int(value)
+
     @classmethod
-    def _parse_selector(cls, match:re.Match, selector):
-        if selector in {
-            Selectors.Equals,
-            Selectors.NotEquals,
-            Selectors.Less,
-            Selectors.LessEquals,
-            Selectors.Greater,
-            Selectors.GreaterEquals
-        }:
-            return cls._numeric_cast(match.group(1))
-        elif selector in {
-            Selectors.Contains,
-            Selectors.Excludes
-        }:
-            return match.group(0)
-        elif selector in {
-            Selectors.IsAny,
-            Selectors.IsNone,
-        }:
-             return [
-                 cls._numeric_cast(t.strip())
-                 for t in match.group(1)[1:-1].split(",")
-             ]
+    def _coerce(cls, value, dtype):
+        if dtype is str:
+            if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+                raise ValueError("Expected a text search value")
+            return str(value)
+        if dtype is bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str) and value.lower() in {'true', 'false'}:
+                return value.lower() == 'true'
+            raise ValueError("Expected true or false")
+        if dtype in {int, float}:
+            if isinstance(value, bool):
+                raise ValueError("Expected a number")
+            value = cls._numeric_cast(value)
+            if not isinstance(value, (int, float)) or (isinstance(value, float) and not math.isfinite(value)):
+                raise ValueError("Expected a finite number")
+            if dtype is int and value != int(value):
+                raise ValueError("Expected an integer")
+            return dtype(value)
+        raise ValueError("This field is not searchable")
+
+    @classmethod
+    def parse_val(cls, value, dtype):
+        selector = Selectors.Equals
+        if isinstance(value, str):
+            text = value.strip()
+            match = re.fullmatch(r'(==|!=|<=|>=|<|>)\s*(.+)', text)
+            words = re.fullmatch(r'(does not contain|contains)\s+(.+)', text, re.DOTALL)
+            members = re.fullmatch(r'(any of|none of)\s*\[(.*)\]', text, re.DOTALL)
+            bounds = re.fullmatch(
+                rf'(not in range|in range)\s*\[\s*({cls._number})\s*,\s*({cls._number})\s*\]', text)
+            if match:
+                selector, value = Selectors(match[1]), match[2]
+            elif words:
+                selector, value = Selectors(words[1]), words[2]
+            elif members:
+                selector = Selectors(members[1])
+                try:
+                    value = json.loads('[' + members[2] + ']')
+                except json.JSONDecodeError:
+                    value = next(csv.reader([members[2]], skipinitialspace=True))
+                if not value or any(item == '' for item in value):
+                    raise ValueError("Supply a nonempty list of search values")
+            elif bounds:
+                selector, value = Selectors(bounds[1]), [bounds[2], bounds[3]]
+            elif re.match(r'^(?:[<>=!]|any of\b|none of\b|(?:not )?in range\b)', text):
+                raise ValueError("Malformed search operator or value")
+        numeric = {Selectors.Less, Selectors.LessEquals, Selectors.Greater,
+                   Selectors.GreaterEquals, Selectors.InRange, Selectors.NotInRange}
+        if selector in numeric and dtype not in {int, float}:
+            raise ValueError("This operator requires a numeric field")
+        if selector in {Selectors.Contains, Selectors.Excludes} and dtype is not str:
+            raise ValueError("Contains requires a text field")
+        if selector in {Selectors.IsAny, Selectors.IsNone, Selectors.InRange, Selectors.NotInRange}:
+            value = [cls._coerce(item, dtype) for item in value]
+            if selector in {Selectors.InRange, Selectors.NotInRange} and value[0] > value[1]:
+                raise ValueError("Range lower bound exceeds upper bound")
         else:
-            return match.groups()
-
-    @classmethod
-    def parse_val(cls, val, dtype):
-        if isinstance(val, str):
-            test = val.strip()
-            # use regex dispatch
-            for pattern, selector in cls.selector_mapping.items():
-                if match := re.match(pattern, test):
-                    val = cls._parse_selector(match, selector)
-                    #selector
-                    break
-            else:
-                selector = Selectors.Equals
-        elif isinstance(val, (float, int)):
-            # just need to check the dtype is valid
-            selector = Selectors.Equals
-        else:
-            raise NotImplementedError(val, dtype)
-        
-        if ProtoHandler.is_enum_type(dtype):
-            if isinstance(val, int):
-                for char,name in ProtoHandler.enum_num_iter(dtype):
-                    if char == val:
-                        val = name
-                        break
-        return val, selector
+            value = cls._coerce(value, dtype)
+        return value, selector
 
     _decamel_caser = re.compile(r'(?<!^)(?=[A-Z])')
     _deid = re.compile(r'ID[A-Z]|ID$')
+
     @classmethod
     def clean_camel_case(cls, name):
-        if name.endswith("List"):
+        if name.endswith('List'):
             name = name[:-4]
-        elif name.endswith("Map"):
+        elif name.endswith('Map'):
             name = name[:-3]
-        name = re.sub(cls._deid, "Id", name)
-        return re.sub(cls._decamel_caser, "_", name).lower()
+        return underscore(re.sub(cls._deid, 'Id', name))
+
     @classmethod
-    def from_path(cls, path, val:str):
-        path = [cls.clean_camel_case(p) for p in path]
-        if len(path) == 1 and path[0] == "dataset_id":
-            dtype = str
-            val, selector = cls.parse_val(val, dtype)
-            return cls(['dataset', path[0]], val, selector, dtype=dtype)
-        else:
-            dtype = reaction_pb2.Reaction
-            tables = [cls.clean_camel_case(dtype.__name__)]
-            subpath = ['reaction']
-            for p in path[:-1]:
-                dtype = ProtoHandler.get_field_type(dtype, p)
-                subpath.append(
-                    cls.clean_camel_case(dtype.value_type.__name__)
-                )
-                # type_list.append(root)
-            if path[-1] == 'allowed_values':
-                subpath[-1] = path[-2]
+    def from_path(cls, path, value):
+        if not path or any(not isinstance(part, (str, int)) or isinstance(part, bool) for part in path):
+            raise ValueError("Invalid search field path")
+        if any((isinstance(part, str) and not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]*', part))
+               or (isinstance(part, int) and part < 0) for part in path):
+            raise ValueError("Invalid search field name")
+        path = [cls.clean_camel_case(part) if isinstance(part, str) else part for part in path]
+        if path == ['dataset_id']:
+            value, selector = cls.parse_val(value, str)
+            return cls(['dataset', 'dataset_id'], value, selector, dtype=str)
+        if path[-1] == 'allowed_values':
+            path = path[:-1]
+        scalar_index = bool(path and isinstance(path[-1], int))
+        if scalar_index:
+            path = path[:-1]
+        descriptor = reaction_pb2.Reaction.DESCRIPTOR
+        scope, joins, tables = [], [], ['reaction']
+        for index, part in enumerate(path):
+            if isinstance(part, int):
+                if part < 0:
+                    raise ValueError("Invalid repeated-field index")
+                continue
+            field = descriptor.fields_by_name.get(part)
+            if field is None:
+                raise ValueError(f"Unknown search field: {descriptor.name}.{part}")
+            if field.message_type is not None:
+                child = field.message_type
+                if child.GetOptions().map_entry:
+                    child = child.fields_by_name['value'].message_type
+                if child is None or index == len(path) - 1:
+                    raise ValueError("Search a scalar field inside the message")
+                scope.append(part)
+                if index + 1 < len(path) and isinstance(path[index + 1], int):
+                    if field.label != field.LABEL_REPEATED:
+                        raise ValueError("Only repeated fields accept a list")
+                    scope.append(path[index + 1])
+                table = underscore(child.name)
+                joins.append((tuple(scope), table, f'{descriptor.name}.{part}', tables[-1]))
+                tables.append(table)
+                descriptor = child
             else:
-                subpath.append(path[-1])
-            if hasattr(dtype, 'value_type'):
-                dtype = dtype.value_type
-            val, selector = cls.parse_val(val, dtype)
-            return cls(subpath, val, selector, dtype=dtype)
+                if index != len(path) - 1:
+                    raise ValueError("A scalar search field cannot contain subfields")
+                if scalar_index and field.label != field.LABEL_REPEATED:
+                    raise ValueError("Only repeated fields accept a list")
+                if field.enum_type is not None:
+                    def enum_value(item):
+                        if isinstance(item, str) and re.fullmatch(r'\d+', item):
+                            item = int(item)
+                        enum = (field.enum_type.values_by_number.get(item) if type(item) is int
+                                else field.enum_type.values_by_name.get(item) if isinstance(item, str) else None)
+                        if enum is None:
+                            raise ValueError(f"Unknown enum value for {part}: {item}")
+                        return enum.name
+                    value, selector = cls.parse_val(value, str)
+                    if selector in {Selectors.Contains, Selectors.Excludes}:
+                        raise ValueError("Select an enum value or list of values")
+                    value = [enum_value(item) for item in value] if isinstance(value, list) else enum_value(value)
+                    dtype = str
+                else:
+                    dtype = ({1: float, 2: float, 3: int, 4: int, 5: int, 6: int, 7: int,
+                              8: bool, 9: str, 13: int, 15: int, 16: int, 17: int, 18: int}).get(field.type)
+                    value, selector = cls.parse_val(value, dtype)
+                return cls(tables + [part], value, selector, dtype=dtype, joins=joins,
+                           repeated=field.label == field.LABEL_REPEATED,
+                           is_enum=field.enum_type is not None)
+        raise ValueError("Search must end at a scalar field")
 
     selector_templates = {
-        Selectors.Equals:"{query_value} = %s",
-        Selectors.NotEquals:"{query_value} <> %s",
-        Selectors.Less:"{query_value} < %s",
-        Selectors.LessEquals:"{query_value} <= %s",
-        Selectors.Greater:"{query_value} > %s",
-        Selectors.GreaterEquals:"{query_value} >= %s",
-        Selectors.IsAny:"{query_value} = ANY(%s)",
-        Selectors.IsNone:"{query_value} <> ANY(%s)",
-        Selectors.Contains:"POSITION(%s IN {query_value}) > 0",
-        Selectors.Excludes:"POSITION(%s IN {query_value}) = 0"
+        Selectors.Equals: '{query_value} = %s',
+        Selectors.NotEquals: '{query_value} <> %s',
+        Selectors.Less: '{query_value} < %s',
+        Selectors.LessEquals: '{query_value} <= %s',
+        Selectors.Greater: '{query_value} > %s',
+        Selectors.GreaterEquals: '{query_value} >= %s',
+        Selectors.IsAny: '{query_value} = ANY(%s)',
+        Selectors.IsNone: '{query_value} <> ALL(%s)',
+        Selectors.Contains: 'POSITION(%s IN {query_value}) > 0',
+        Selectors.Excludes: 'POSITION(%s IN {query_value}) = 0',
+        Selectors.InRange: '{query_value} BETWEEN %s AND %s',
+        Selectors.NotInRange: '{query_value} NOT BETWEEN %s AND %s',
     }
-    selector_casts = {
-        str:'text',
-        int:'int',
-        float:'float'
-    }
+
     @classmethod
     def prep_sql_query(cls, table, property, value, selector, dtype):
-        query_value = f'{table}.{property}'
-        if dtype is not None:
-            for cast_type, cast_str in cls.selector_casts.items():
-                if isinstance(value, cast_type):
-                    if dtype != cast_type:
-                        query_value = f'CAST({query_value} AS {cast_str})'
-                    break
+        return 'WHERE ' + cls.selector_templates[selector].format(query_value=f'{table}.{property}')
 
-        return "WHERE " + cls.selector_templates[selector].format(query_value=query_value)
-    
+    def predicate(self, alias):
+        column = f'{alias}.{self.path[-1]}'
+        if not self.repeated:
+            if self.is_enum:
+                column = f'CAST({column} AS text)'
+            return self.selector_templates[self.selector].format(query_value=column)
+        negative = {Selectors.NotEquals: Selectors.Equals, Selectors.IsNone: Selectors.IsAny,
+                    Selectors.Excludes: Selectors.Contains, Selectors.NotInRange: Selectors.InRange}
+        selector = negative.get(self.selector, self.selector)
+        value = 'CAST(search_value.value AS text)' if self.is_enum else 'search_value.value'
+        condition = self.selector_templates[selector].format(query_value=value)
+        return (('NOT ' if self.selector in negative else '')
+                + f'EXISTS (SELECT 1 FROM unnest({column}) AS search_value(value) WHERE {condition})')
+
     def to_sql(self):
-        # priors = (self.root,) + self.path
-        lines = [
-            f"JOIN {constants.SCHEMA_NAME}.{next} ON {next}.{prev}_id = {prev}.id"
-            for next, prev in zip(self.path[1:-1], self.path[:-2])
-        ]
-        lines.append(
-            self.prep_sql_query(self.path[-2], self.path[-1], self.val, self.selector, self.dtype)
-        )
-        return "\n".join(lines)
+        lines = [f'JOIN {constants.SCHEMA_NAME}.{child} ON {child}.{parent}_id = {parent}.id'
+                 for child, parent in zip(self.path[1:-1], self.path[:-2])]
+        lines.append('WHERE ' + self.predicate(self.path[-2]))
+        return '\n'.join(lines)
 
 class ComposedQuery(ReactionQueryBase):
     components:list[QueryFragment]
     def to_params(self):
-        return [c.val for c in self.components]
+        return [value for component in self.components for value in component.parameters()]
 
     def json(self) -> str:
         return json.dumps(self.to_params())
@@ -1209,7 +1257,7 @@ class ComposedQuery(ReactionQueryBase):
     select_header = f"""
 SELECT DISTINCT dataset.dataset_id, reaction.reaction_id, reaction.proto
 FROM {constants.SCHEMA_NAME}.reaction
-JOIN dataset ON dataset.id = reaction.dataset_id
+JOIN {constants.SCHEMA_NAME}.dataset ON dataset.id = reaction.dataset_id
         """.strip()
     def to_query_components(self) -> list[sql.SQL]:
         selects = [
@@ -1276,24 +1324,61 @@ class AdvancedSearchQuery(ComposedQuery):
         queue = collections.deque([[[], js]])
         while queue:
             path, head = queue.pop()
+            if len(path) > 32:
+                raise ValueError("Search paths may contain at most 32 fields")
             if isinstance(head, dict):
                 queue.extend(
                     [path + [k], v]
                     for k, v in head.items()
                 )
             elif isinstance(head, (list, tuple)):
-                queue.extend([path, v] for v in head)
+                queue.extend([path + [index], value] for index, value in enumerate(head))
             else:
                 paths.append((path, head))
+                if len(paths) > 128:
+                    raise ValueError("Supply at most 128 search values")
         return paths
 
     @classmethod
     def from_json(cls, js):
-        return cls([
-            SchemaQueryFragment.from_path(p, v)
-            for p,v in cls.flatten_json_tree(js)
-        ])
-    
+        if not isinstance(js, dict) or not js:
+            raise ValueError("Supply a nonempty search object")
+        paths = cls.flatten_json_tree(js)
+        if not paths or len(paths) > 128 or any(len(path) > 32 for path, _ in paths):
+            raise ValueError("Supply 1 to 128 search values with paths no deeper than 32 fields")
+        return cls([SchemaQueryFragment.from_path(path, value) for path, value in paths])
+
+    def _statement(self):
+        # Preserve each repeated item and protobuf relationship context. Predicates
+        # on one measurement must not be satisfied by different measurements.
+        aliases, joins, conditions, parameters = {}, [], [], []
+        for component in self.components:
+            parent = 'reaction'
+            for scope, table, context, parent_table in component.joins:
+                if scope not in aliases:
+                    alias = f'search_{len(aliases)}'
+                    aliases[scope] = alias
+                    joins.append(f'JOIN {constants.SCHEMA_NAME}.{table} AS {alias} '
+                                 f'ON {alias}.{parent_table}_id = {parent}.id '
+                                 f'AND {alias}.cmccdb_schema_context = %s')
+                    parameters.append(context)
+                parent = aliases[scope]
+            if component.path[0] == 'dataset':
+                parent = 'dataset'
+            conditions.append(component.predicate(parent))
+        for component in self.components:
+            parameters.extend(component.parameters())
+        statement = (self.select_header + '\n' + '\n'.join(joins) + '\nWHERE '
+                     + ' AND '.join(f'({condition})' for condition in conditions)
+                     + '\nORDER BY dataset.dataset_id, reaction.reaction_id')
+        return statement, parameters
+
+    def to_query_components(self):
+        return [sql.SQL(self._statement()[0])]
+
+    def to_params(self):
+        return self._statement()[1]
+
     def prep_query(self):
         components = self.to_query_components()
         args = self.to_params()
