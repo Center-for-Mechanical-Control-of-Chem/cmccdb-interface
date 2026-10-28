@@ -118,6 +118,10 @@ def gh_logout():
         return flask.redirect(origin_url)
 
 @bp.route("/api/user-info", methods=["GET"])
+def user_info():
+    return flask.jsonify(gh_get_cache_user_info())
+
+
 def gh_get_cache_user_info():
     email = flask.session.get("github_email")
     if email is None:

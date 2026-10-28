@@ -182,5 +182,9 @@ export default {
           transform: translateY(-10px)
   @media (max-width: 1000px)
     margin-top: 2.5rem
+    .action-button-holder
+      margin: 0 0 1rem
+      justify-content: flex-start
+      flex-wrap: wrap
 
 </style>

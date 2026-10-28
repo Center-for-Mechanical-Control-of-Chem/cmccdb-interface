@@ -20,6 +20,7 @@
 export default {
   data: () => ({
     isDevelopment: process.env.NODE_ENV === "development",
+    showNavigation: false,
     database: "cmcc", 
     user: {
         name: null,
@@ -42,10 +43,9 @@ export default {
     },
     inPreview() {
       const hostname = location.host;
-      console.log(hostname);
       return (hostname) && (hostname.startsWith('preview-'))
     },
-    reroute(event) {
+    reroute() {
       const urlParams = this.getSearchParams()
       if (this.database.length) {
         urlParams.set("database", this.database)
@@ -60,20 +60,20 @@ export default {
       window.location.href = "/api/authenticate?" + searchParams.toString()
     },
     async getUserData() {
-      if (!this.user.ghAuthenticated) {
-        fetch("/api/user-info").then(
-          (response) => response.json().then(
-            (authData) => {
-              if (authData !== null) {
-                this.user.ghAuthenticated = true
-                this.user.name = authData.name
-                this.user.email = authData.email
-                this.user.cmccMember = authData.member
-                this.user.username = authData.username
-              }
-            }
-          )
-        )
+      if (this.user.ghAuthenticated) return
+      try {
+        const response = await fetch("/api/user-info")
+        if (!response.ok) return
+        const authData = await response.json()
+        if (authData && typeof authData === "object" && authData.username) {
+          this.user.ghAuthenticated = true
+          this.user.name = authData.name
+          this.user.email = authData.email
+          this.user.cmccMember = authData.member
+          this.user.username = authData.username
+        }
+      } catch (_) {
+        // Browsing remains available when sign-in status cannot be loaded.
       }
     }
   }
@@ -91,7 +91,15 @@ nav.navbar.navbar-expand-lg.bg-light(:class="{ 'dev-navigation': isDevelopment }
         alt="CMCC Logo"
         height="30"
       )
-    #navbarNav.collapse.navbar-collapse
+    button.navbar-toggler(
+      type="button"
+      aria-label="Toggle navigation"
+      aria-controls="navbarNav"
+      :aria-expanded="showNavigation"
+      @click="showNavigation = !showNavigation"
+    )
+      span Menu
+    #navbarNav.collapse.navbar-collapse(:class="{show: showNavigation}")
       .navbar-nav
         .nav-item
           router-link.nav-link(:to='{name: "browse", query:{"database":$route.query.database}}') Browse
@@ -111,7 +119,7 @@ nav.navbar.navbar-expand-lg.bg-light(:class="{ 'dev-navigation': isDevelopment }
             id="db-selector"
             type="text"
             v-model="database"
-            @change="$event => (this.reroute(event))"
+            @change="reroute"
           )
     .navbar-nav
       .nav-item
@@ -155,6 +163,20 @@ nav
             color: $bg-primary
             &:hover
               color: $bg-secondary
+  @media (max-width: 991.98px)
+    .container
+      flex-wrap: wrap
+      gap: 0.5rem
+      .navbar-toggler
+        margin-left: auto
+      #navbarNav
+        order: 4
+        flex-basis: 100%
+        .navbar-nav
+          margin-left: 0
+      > .navbar-nav.pe-3
+        flex: 1 1 100%
+        padding-right: 0 !important
 .dev-preview
   background: #0f766e
   color: #ffffff
